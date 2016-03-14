@@ -1,0 +1,16 @@
+# autogen
+/configure
+/Makefile
+/setup.*
+/opam/
+/.merlin
+
+# Makefile
+/_build/
+/*.docdir
+/*.byte
+/*.native
+
+# Editors
+\#*\#
+*.swp
