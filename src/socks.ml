@@ -35,6 +35,11 @@ let make_socks4_request ~username hostname port =
 let string_of_socks5_authentication_method = function
   | No_authentication_required -> "\x00"
   | Username_password _ -> "\x02"
+  | No_acceptable_methods -> "\xFF"
+
+let string_of_socks5_reply_field = function
+  | Succeeded -> "\x00"
+  | Failure -> "\xFF" (* TODO look this up*)
 
 let make_socks5_auth_request ~username hostname port =
   String.concat ""
@@ -57,7 +62,7 @@ let make_socks5_request hostname port =
   (* TODO check if hostname > 255 *)
   String.concat ""
   [ (* SOCKS5 version*)
-  ; "\x05"
+    "\x05"
     (* CMD (we only implement 'connect' *)
   ; "\x01"
     (* RSV - reserved *)
@@ -69,10 +74,10 @@ let make_socks5_request hostname port =
   ; String.(length hostname) |> char_of_int |> String.make 1
   ; hostname
     (* port *)
-  ; bigendian_port_of_port
+  ; bigendian_port_of_int port
   ]
 
-let make_socks5_response ~bnd_port:int reply_field =
+let make_socks5_response ~bnd_port reply_field =
   String.concat ""
   [ (* SOCKS version *)
     "\x05"
@@ -86,36 +91,38 @@ let make_socks5_response ~bnd_port:int reply_field =
   ; "\x00\x00\x00\x00"
     (* BND.PORT - TODO handle ATYP *)
   ; bigendian_port_of_int bnd_port
+  ]
 
 let make_socks5_username_password_request ~username ~password =
   String.concat ""
   [ (* SOCKS 5 version *)
-  ; "\x05"
+    "\x05"
     (* ULEN - username length *)
-  ; username |> String.length |> char_of_int
+  ; username |> String.length |> char_of_int |> String.make 1
     (* UNAME - username *)
   ; username
     (* PLEN - password length *)
-  ; password |> String.length |> char_of_int
+  ; password |> String.length |> char_of_int |> String.make 1
     (* PASSWD - password *) 
   ; password
   ]
 
-let parse_socks5_username_password_request buf =
+let parse_socks5_username_password_request buf : socks5_username_password_request_parse_result =
   let buf_len = String.length buf in
-  if buf_len < 3 then R.error Incomplete_request
+  if buf_len < 3 then Incomplete_request
   else
   begin match buf.[0], buf.[1] with
   | '\x05', ulen ->
-     if buf_len < 3 + ulen then R.error Incomplete_request
+     let ulen = int_of_char ulen in
+     if buf_len < 3 + ulen then Incomplete_request
      else
-     let username = String.sub 2 ulen in
-     let plen = buf.[1+1+ulen] in
-     if buf_len < 3 + ulen + plen then R.error Incomplete_request
+     let username = String.sub buf 2 ulen in
+     let plen = int_of_char buf.[1+1+ulen] in
+     if buf_len < 3 + ulen + plen then Incomplete_request
      else
-     let password = String.sub (3 + ulen) (buf_len - 3 - ulen) in
-     R.ok { username ; password }
-  | _ -> R.error Invalid_request
+     let password = String.sub buf (3 + ulen) (buf_len - 3 - ulen) in
+     Username_password (username , password )
+  | _ -> Invalid_request
   end
 
 let make_response ~(success : bool) = String.concat ""
@@ -133,8 +140,8 @@ let make_response ~(success : bool) = String.concat ""
   ]
 
 let socks5_authentication_method_of_char = function
-  | 0 -> No_authentication_required
-  | 3 -> Username_password
+  | '\x00' -> No_authentication_required
+  | '\x03' -> Username_password ("", "")
   | _ -> No_acceptable_methods
 
 let int_of_bigendian_port_tuple ~port_msb ~port_lsb =
@@ -156,19 +163,20 @@ let parse_socks5_connect buf =
       if atyp_len = 0 then R.error Invalid_request
       else
       let address = String.sub buf 5 atyp_len in
-      let port = String.sub buf (5+atyp_len) 2
-        |> int_of_bigendian_port_tuple ~port_msb:buf[5+atyp_len] ~port_lsb:buf.[5+atyp_len+1]
+      let port = int_of_bigendian_port_tuple
+                   ~port_msb:buf.[5+atyp_len]
+                   ~port_lsb:buf.[5+atyp_len+1]
       in
       R.ok { port ; address }
-  | exception Invalid_argument -> R.error ()
-  | _ -> R.error ()
+  | exception Invalid_argument _ -> R.error Incomplete_request
+  | _ -> R.error Invalid_request
   end
 
-let parse_request buf =
+let parse_request buf : request_result =
   let buf_len = Bytes.length buf in
   begin match buf.[0], buf.[1] with
    | '\x05', nmethods  -> (* SOCKS 5 CONNECT *)
-     let nmethods = int_of_char methods in
+     let nmethods = int_of_char nmethods in
      if nmethods < 1 then Invalid_request
      else
      let method_selection_end = 1 (* version *) + 1 (* nmethods *) + nmethods in
@@ -177,11 +185,11 @@ let parse_request buf =
      else
      let rec auth_methods acc n =
        if n > 0
-       then auth_methods [socks5_authentication_method_of_char buf.[1+n] :: acc] (n-1)
+       then auth_methods (socks5_authentication_method_of_char buf.[1+n] :: acc) (n-1)
        else acc
      in
      Socks5_method_selection_request
-       ( (auth_methods acc nmethods)
+       ( (auth_methods [] nmethods) ,
          (String.sub buf method_selection_end (buf_len - method_selection_end) ))
    | _ -> 
   begin match buf.[0] , buf.[1], buf.[2], buf.[3] with
@@ -194,7 +202,7 @@ let parse_request buf =
         then Incomplete_socks4_request
         else Invalid_request
     | username_end ->
-      let port = int_of_bigendian_port_tuple ~msb:port_msb ~lsb:port_lsb in
+      let port = int_of_bigendian_port_tuple ~port_msb:port_msb ~port_lsb:port_lsb in
       let username = Bytes.sub_string buf username_offset (username_end - username_offset) in
       begin match buf.[4], buf.[5], buf.[6] with
       | exception Invalid_argument _ ->
@@ -218,6 +226,7 @@ let parse_request buf =
       end
     end
   | _ -> Invalid_request
+  end
   end
 
 let parse_response result =
