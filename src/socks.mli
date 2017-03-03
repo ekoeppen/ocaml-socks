@@ -1,3 +1,5 @@
+open Socks_types
+
 val make_socks4_request : username:string -> string -> int -> string
 val make_socks5_auth_request : username:'a -> 'b -> 'c -> string
 val make_socks5_auth_response :

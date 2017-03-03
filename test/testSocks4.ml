@@ -7,7 +7,7 @@ let is_invalid (r : request_result) =
   r = Invalid_request
 
 let is_incomplete (r : request_result) =
-  r = Incomplete_socks4_request || r = Incomplete_socks5_method_selection_request
+  r = Incomplete_request
 
 let is_request = function Ok _ -> true | _ -> false
 

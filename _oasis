@@ -1,6 +1,6 @@
 # See https://ocaml.org/learn/tutorials/setting_up_with_oasis.html for more
 OASISFormat:    0.4
-OCamlVersion:   >= 4.04.0
+OCamlVersion:   >= 4.03.0
 Name:           socks
 Version:        0.1
 Maintainers:    root@localhost
@@ -29,7 +29,7 @@ Library socks_lwt
   FindLibParent: socks
   Path: src
   Modules: Socks4_lwt
-  BuildDepends: rresult, lwt
+  BuildDepends: rresult, lwt, lwt.ppx
 
 Executable "ounit_test"
   Build$: flag(tests)

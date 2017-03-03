@@ -174,7 +174,7 @@ let parse_socks5_connect buf =
 
 let parse_request buf : request_result =
   let buf_len = Bytes.length buf in
-  if buf_len < 3 then Incomplete_socks4_request else
+  if buf_len < 3 then Incomplete_request else
   begin match buf.[0], buf.[1] with
    | '\x05', nmethods  -> (* SOCKS 5 CONNECT *)
      let nmethods = int_of_char nmethods in
@@ -182,7 +182,7 @@ let parse_request buf : request_result =
      else
      let method_selection_end = 1 (* version *) + 1 (* nmethods *) + nmethods in
      if buf_len < method_selection_end
-     then Incomplete_socks5_method_selection_request
+     then Incomplete_request
      else
      let rec auth_methods acc n =
        if n > 0
@@ -194,26 +194,26 @@ let parse_request buf : request_result =
          (String.sub buf method_selection_end (buf_len - method_selection_end) ))
    | _ -> 
   begin match buf.[0] , buf.[1], buf.[2], buf.[3] with
-  | exception Invalid_argument _ -> Incomplete_socks4_request
+  | exception Invalid_argument _ -> Incomplete_request
   | '\x04' , '\x01' , port_msb, port_lsb -> (* SOCKS 4 CONNECT*)
     let username_offset = 8 in
     begin match Bytes.index_from buf username_offset '\x00' with
     | exception Not_found -> (*no user_id / user_id > 255 *)
         if buf_len < username_offset + 256
-        then Incomplete_socks4_request
+        then Incomplete_request
         else Invalid_request
     | username_end ->
       let port = int_of_bigendian_port_tuple ~port_msb:port_msb ~port_lsb:port_lsb in
       let username = Bytes.sub_string buf username_offset (username_end - username_offset) in
       begin match buf.[4], buf.[5], buf.[6] with
       | exception Invalid_argument _ ->
-          Incomplete_socks4_request
+          Incomplete_request
       | '\x00' , '\x00', '\x00' ->
         let address_offset = 1 + username_end in
         begin match Bytes.index_from buf address_offset '\x00' with
         | exception Not_found -> (*no domain name / domain name > 255 *)
             if buf_len < address_offset + 256
-            then Incomplete_socks4_request
+            then Incomplete_request
             else Invalid_request
         | address_end ->
           let address = Bytes.sub_string buf address_offset (address_end - address_offset) in
