@@ -3,7 +3,7 @@
 *)
 
 open Lwt
-open Socks4
+open Socks
 
 let connect_client (username : string)
                    (proxy_fd_in   : Lwt_io.input_channel)

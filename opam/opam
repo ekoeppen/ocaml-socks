@@ -5,7 +5,7 @@ maintainer: "root@localhost"
 authors: [ "none" ]
 license: "gopher://license.to.kill"
 homepage: "https://github.com/cfcs/ocaml-socks"
-dev-repo: "https://github.com/cfcs/ocaml-socks.git"
+dev-repo: "https://github.com/cfcs/ocaml-socks"
 bug-reports: "https://github.com/cfcs/ocaml-socks/issues"
 build: [
   ["oasis" "setup"]
@@ -24,9 +24,10 @@ build-test: [
 ]
 depends: [
   "lwt"
-  "oasis" {build & >= "0.4"}
+  "oasis" {build & >= "0.4.7"}
+  "ocamlbuild" {build}
   "ocamlfind" {build}
   "ounit" {test}
   "rresult"
 ]
-available: [ ocaml-version >= "4.02.3" ]
+available: [ ocaml-version >= "4.04.0" ]

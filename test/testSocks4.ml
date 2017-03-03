@@ -1,5 +1,5 @@
 open OUnit2
-open Socks4
+open Socks
 open Rresult
 
 let is_invalid r =

@@ -1,0 +1,12 @@
+# OASIS_START
+# DO NOT EDIT (digest: 992bfc7b66e8a08949bf78e732bd178a)
+version = "0.1"
+description = "SOCKS proxy"
+requires = "rresult"
+archive(byte) = "socks.cma"
+archive(byte, plugin) = "socks.cma"
+archive(native) = "socks.cmxa"
+archive(native, plugin) = "socks.cmxs"
+exists_if = "socks.cma"
+# OASIS_STOP
+
