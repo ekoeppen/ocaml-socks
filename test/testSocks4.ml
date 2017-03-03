@@ -1,12 +1,13 @@
 open OUnit2
 open Socks
+open Socks_types
 open Rresult
 
-let is_invalid r =
-  r = Result.Error Invalid_request
+let is_invalid (r : request_result) =
+  r = Invalid_request
 
-let is_incomplete r =
-  r = Result.Error Incomplete_request
+let is_incomplete (r : request_result) =
+  r = Incomplete_socks4_request || r = Incomplete_socks5_method_selection_request
 
 let is_request = function Ok _ -> true | _ -> false
 
@@ -14,7 +15,7 @@ let test_make_request _ =
   let username = "myusername" in
   let hostname = "example.com" in
   assert_bool "example.com:4321"
-    (make_request ~username "example.com" 4321
+    (make_socks4_request ~username "example.com" 4321
     = "\x04\x01"
     ^ "\x10\xe1" (* port *)
     ^ "\x00\x00\x00\xff"
@@ -36,14 +37,14 @@ let invalid_requests _ =
   assert_bool "invalid protocol" (is_invalid (parse_request "\x00\x001234567")) ;;
 
 let incomplete_requests _ =
-  "12345678"
+  "\x04"
   |> parse_request |> is_incomplete |> assert_bool
   "8 bytes" ;;
 
 let requests _ =
-  let r = make_request ~username:"user" "host" 515 in
+  let r = make_socks4_request ~username:"user" "host" 515 in
   begin match parse_request r with
-  | Result.Ok pr ->
+  | Socks4_request pr ->
       (pr.port = 515 && pr.username = "user"
        && pr.address = "host")
   | _ -> false

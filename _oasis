@@ -25,11 +25,11 @@ Library socks
   Modules: Socks
   BuildDepends: rresult
 
-#Library socks_lwt
-#  FindLibParent: socks
-#  Path: src
-#  Modules: Socks4_lwt
-#  BuildDepends: rresult, lwt, lwt.syntax
+Library socks_lwt
+  FindLibParent: socks
+  Path: src
+  Modules: Socks4_lwt
+  BuildDepends: rresult, lwt
 
 Executable "ounit_test"
   Build$: flag(tests)

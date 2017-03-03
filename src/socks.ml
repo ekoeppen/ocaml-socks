@@ -7,7 +7,7 @@ https://en.wikipedia.org/wiki/SOCKS#SOCKS4a
 *)
 
 open Rresult
-open Socks_types
+include Socks_types
 
 let bigendian_port_of_int port =
   String.concat ""
@@ -174,6 +174,7 @@ let parse_socks5_connect buf =
 
 let parse_request buf : request_result =
   let buf_len = Bytes.length buf in
+  if buf_len < 3 then Incomplete_socks4_request else
   begin match buf.[0], buf.[1] with
    | '\x05', nmethods  -> (* SOCKS 5 CONNECT *)
      let nmethods = int_of_char nmethods in
