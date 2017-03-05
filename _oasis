@@ -37,7 +37,7 @@ Executable "ounit_test"
   MainIs: test.ml
   CompiledObject: best
   Install: false
-  BuildDepends: oUnit, socks, rresult
+  BuildDepends: oUnit, qcheck, socks, rresult
 
 Test "ounit_test"
   Run$: flag(tests)
