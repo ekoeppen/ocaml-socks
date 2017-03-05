@@ -25,5 +25,5 @@ let test_making_a_request ctx =
 ;;
 
 let suite = [
-  "test_making_a_request" >:: test_making_a_request;
+  "make_socks4_request" >:: test_making_a_request;
   ]

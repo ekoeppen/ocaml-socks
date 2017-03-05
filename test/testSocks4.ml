@@ -52,7 +52,7 @@ let requests _ =
   "self-check request" ;;
 
 (** TODO: OUnit2 should detect test cases automatically. *)
-let suite = "ts_hand" >::: [
+let suite = [
     "make_request" >:: test_make_request;
     "make_response" >:: test_make_response;
     "parse_request: invalid_requests" >:: invalid_requests;
