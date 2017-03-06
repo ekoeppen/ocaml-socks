@@ -25,6 +25,14 @@ Library socks
   Modules: Socks
   BuildDepends: rresult
 
+Document src
+  Title: Documentation and API reference
+  Type: ocamlbuild (0.3)
+  BuildTools+: ocamldoc
+  XOCamlbuildPath: src
+  XOCamlbuildModules: Socks, Socks_types, Socks4_lwt
+  Install: false
+
 Library socks_lwt
   FindLibParent: socks
   Path: src
