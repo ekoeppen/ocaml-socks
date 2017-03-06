@@ -14,3 +14,7 @@
 # Editors
 \#*\#
 *.swp
+
+# Oasis stuff
+setup.data
+setup.log
