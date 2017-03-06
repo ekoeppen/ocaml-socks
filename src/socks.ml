@@ -190,15 +190,15 @@ let parse_request buf : request_result =
        else acc
      in
      Socks5_method_selection_request
-       ( (auth_methods [] nmethods) ,
+       ( (auth_methods [] nmethods),
          (String.sub buf method_selection_end (buf_len - method_selection_end) ))
    | _ -> 
-  begin match buf.[0] , buf.[1], buf.[2], buf.[3] with
+  begin match buf.[0], buf.[1], buf.[2], buf.[3] with
   | exception Invalid_argument _ -> Incomplete_request
   | '\x04' , '\x01' , port_msb, port_lsb -> (* SOCKS 4 CONNECT*)
     let username_offset = 8 in
     begin match Bytes.index_from buf username_offset '\x00' with
-    | exception Not_found -> (*no user_id / user_id > 255 *)
+    | exception Not_found -> (* no user_id / user_id > 255 *)
         if buf_len < username_offset + 256
         then Incomplete_request
         else Invalid_request
@@ -211,7 +211,7 @@ let parse_request buf : request_result =
       | '\x00' , '\x00', '\x00' ->
         let address_offset = 1 + username_end in
         begin match Bytes.index_from buf address_offset '\x00' with
-        | exception Not_found -> (*no domain name / domain name > 255 *)
+        | exception Not_found -> (* no domain name / domain name > 255 *)
             if buf_len < address_offset + 256
             then Incomplete_request
             else Invalid_request
@@ -234,7 +234,7 @@ let parse_response result =
   if 8 > Bytes.length result then
     R.error Incomplete_response
   else
-  if   result.[0] = '\x00'
+  if result.[0] = '\x00'
     && result.[1] = '\x5a'
     (* TODO not checking port *)
     && result.[4] = '\x00'
