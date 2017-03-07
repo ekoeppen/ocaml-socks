@@ -43,8 +43,8 @@ let incomplete_requests _ =
 
 let requests _ =
   let r = make_socks4_request ~username:"user" "host" 515 in
-  begin match parse_request r with
-  | Socks4_request pr ->
+  begin match parse_request (r ^ "X") with
+  | Socks4_request (pr , "X") ->
       (pr.port = 515 && pr.username = "user"
        && pr.address = "host")
   | _ -> false

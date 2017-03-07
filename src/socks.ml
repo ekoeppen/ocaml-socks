@@ -41,13 +41,17 @@ let string_of_socks5_reply_field = function
   | Succeeded -> "\x00"
   | Failure -> "\xFF" (* TODO look this up*)
 
-let make_socks5_auth_request ~username hostname port =
+let make_socks5_auth_request ~username ~password =
   String.concat ""
     [ (* field 1: SOCKS version *)
       "\x05"
       (* NMETHODS - number of METHODS *)
     ; "\x01"
-    ; string_of_socks5_authentication_method No_authentication_required
+    ; string_of_socks5_authentication_method @@ Username_password ("", "")
+    ; String.length username |> char_of_int |> String.make 1
+    ; username
+    ; String.length password |> char_of_int |> String.make 1
+    ; password
     ]
 
 let make_socks5_auth_response auth_method =
@@ -120,8 +124,10 @@ let parse_socks5_username_password_request buf : socks5_username_password_reques
      let plen = int_of_char buf.[1+1+ulen] in
      if buf_len < 3 + ulen + plen then Incomplete_request
      else
-     let password = String.sub buf (3 + ulen) (buf_len - 3 - ulen) in
-     Username_password (username , password )
+     let password = String.sub buf (3 + ulen) ( 3 + ulen + plen) in
+     Username_password (username , password,
+                        String.(sub buf (3 + ulen + plen) (buf_len - 3 - ulen - plen))
+     )
   | _ -> Invalid_request
   end
 
@@ -167,7 +173,7 @@ let parse_socks5_connect buf =
                    ~port_msb:buf.[5+atyp_len]
                    ~port_lsb:buf.[5+atyp_len+1]
       in
-      R.ok { port ; address }
+      R.ok ({ port ; address }, String.sub buf (5+atyp_len+2) (buf_len-atyp_len-2) )
   | exception Invalid_argument _ -> R.error Incomplete_request
   | _ -> R.error Invalid_request
   end
@@ -217,13 +223,15 @@ let parse_request buf : request_result =
             else Invalid_request
         | address_end ->
           let address = String.sub buf address_offset (address_end - address_offset) in
-          Socks4_request { port ; username ; address}
+          Socks4_request ({ port ; username ; address},
+                         String.sub buf address_end (buf_len-address_end-1))
         end
       | _ -> (* address is an IPv4 tuple *)
         let address = String.concat "." List.(map
           (fun i -> string_of_int (int_of_char buf.[i])) [ 4; 5; 6; 7 ] )
         in
-        Socks4_request { port ; username ; address}
+        Socks4_request ({ port ; username ; address}
+          , String.sub buf (username_end + 4) (buf_len - username_end - 4))
       end
     end
   | _ -> Invalid_request
@@ -231,7 +239,8 @@ let parse_request buf : request_result =
   end
 
 let parse_response result =
-  if 8 > String.length result then
+  let buf_len = String.length result in
+  if 8 > buf_len then
     R.error Incomplete_response
   else
   if result.[0] = '\x00'
@@ -242,6 +251,9 @@ let parse_response result =
     && result.[6] = '\x00'
     && result.[7] = '\xff'
   then
-    R.ok ()
+    if buf_len <> 8 then
+      R.ok @@ String.sub result 8 (buf_len - 8)
+    else
+      R.ok ""
   else
     R.error Rejected

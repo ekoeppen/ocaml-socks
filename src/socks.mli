@@ -8,11 +8,15 @@ open Socks_types
 
 val make_socks4_request : username:string -> string -> int -> string
 (** [make_socks4_request ~username hostname port] returns a binary string
-    which represents a SOCKS4 request. *)
+    which represents a SOCKS4A request.
+    The SOCKS4A protocol does not support password authentication.
+*)
 
-val make_socks5_auth_request : username:'a -> 'b -> 'c -> string
-(** [make_socks5_auth_request ~username hostname port] returns a binary
-    string which represents a SOCKS5 authentication request. *)
+val make_socks5_auth_request : username:string -> password:string -> string
+(** [make_socks5_auth_request ~username ~password ] returns a binary
+    string which represents a SOCKS5 authentication request.
+    This library only supports username/password authentication.
+*)
 
 val make_socks5_auth_response : socks5_authentication_method -> string
 (** [make_socks5_auth_response auth_method] returns a binary string which
@@ -49,7 +53,7 @@ val socks5_authentication_method_of_char : char -> socks5_authentication_method
 
 val parse_socks5_connect :
   string ->
-  (socks5_connect, socks5_username_password_request_parse_result)
+  (socks5_connect * leftover_bytes, socks5_username_password_request_parse_result)
   Result.result
 (** [parse_socks5_connect buf] returns an OK result with port and hostname
     if [buf] represents a SOCKS5 CONNECT command with the DOMAINNAME form.
@@ -63,7 +67,7 @@ val parse_request : string -> request_result
     Or, it's a SOCKS 4 CONNECT request, either using a domain name or an IPv4
     IP address. *)
 
-val parse_response : string -> (unit, response_error) Result.result
+val parse_response : string -> (leftover_bytes, response_error) Result.result
 (** [parse_response result] returns an OK [Result.result] with a unit value on
     success, and a [Rejected] on failure. Bad values return an
     [Incomplete_response]. *)
