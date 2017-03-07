@@ -15,8 +15,8 @@ let test_make_request _ =
   let username = "myusername" in
   let hostname = "example.com" in
   assert_bool "example.com:4321"
-    (make_socks4_request ~username "example.com" 4321
-    = "\x04\x01"
+    (make_socks4_request ~username ~hostname:"example.com" 4321
+    = R.ok @@ "\x04\x01"
     ^ "\x10\xe1" (* port *)
     ^ "\x00\x00\x00\xff"
     ^ username ^ "\x00"
@@ -42,13 +42,19 @@ let incomplete_requests _ =
   "8 bytes" ;;
 
 let requests _ =
-  let r = make_socks4_request ~username:"user" "host" 515 in
-  begin match parse_request (r ^ "X") with
-  | Socks4_request (pr , "X") ->
-      (pr.port = 515 && pr.username = "user"
-       && pr.address = "host")
-  | _ -> false
-  end |> assert_bool
+  let r = make_socks4_request ~username:"user" ~hostname:"host" 515 in
+  begin match r with
+  | Ok r ->
+    begin match parse_request (r ^ "X") with
+    | Socks4_request (pr , "X") ->
+      (   pr.port     = 515
+       && pr.username = "user"
+       && pr.address  = "host")
+    | _ -> false
+    end
+  | Error Invalid_hostname -> false
+  end
+  |> assert_bool
   "self-check request" ;;
 
 (** TODO: OUnit2 should detect test cases automatically. *)

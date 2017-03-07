@@ -6,8 +6,8 @@ open Socks_types
     CONNECT headers (the current version does not handle BIND since
     I haven't seen that in use anywhere). *)
 
-val make_socks4_request : username:string -> string -> int -> string
-(** [make_socks4_request ~username hostname port] returns a binary string
+val make_socks4_request : username:string -> hostname:string -> int -> (string, request_invalid_argument) Result.result
+(** [make_socks4_request ~username ~hostname port] returns a binary string
     which represents a SOCKS4A request.
     The SOCKS4A protocol does not support password authentication.
 *)
@@ -22,10 +22,12 @@ val make_socks5_auth_response : socks5_authentication_method -> string
 (** [make_socks5_auth_response auth_method] returns a binary string which
     represents a SOCKS5 authentication response. *)
 
-val make_socks5_request : string -> int -> string
+val make_socks5_request : string -> int -> (string, request_invalid_argument) Result.result
 (** [make_socks5_request hostname port] returns a binary string which
     represents a SOCKS5 request which comprises a CONNECT operation with the
-    ATYP (address type) set to 'DOMAINNAME'. *)
+    ATYP (address type) set to 'DOMAINNAME'.
+    The length of DOMAINNAME must be 1..255
+*)
 
 val make_socks5_response : bnd_port:int -> socks5_reply_field -> string
 (** [make_socks5_response ~bnd_port reply_field] returns a binary string which

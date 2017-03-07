@@ -16,7 +16,11 @@ let bigendian_port_of_int port =
     ;  port land 0xff          |> char_of_int |> String.make 1
     ]
 
-let make_socks4_request ~username hostname port =
+let make_socks4_request ~username ~hostname port =
+  let hostname_len = String.length hostname in
+  if 255 < hostname_len || 0 = hostname_len then
+    R.error Invalid_hostname
+  else R.ok @@
   String.concat ""
     [ (* field 1: SOCKS version *)
       "\x04"
@@ -64,6 +68,10 @@ let make_socks5_auth_response auth_method =
 
 let make_socks5_request hostname port =
   (* TODO check if hostname > 255 *)
+  let hostname_len = String.length hostname in
+  if 255 < hostname_len || 0 = hostname_len then
+    R.error Invalid_hostname
+  else R.ok @@
   String.concat ""
   [ (* SOCKS5 version*)
     "\x05"
@@ -224,14 +232,14 @@ let parse_request buf : request_result =
         | address_end ->
           let address = String.sub buf address_offset (address_end - address_offset) in
           Socks4_request ({ port ; username ; address},
-                         String.sub buf address_end (buf_len-address_end-1))
+                         String.sub buf (address_end + 1) (buf_len - address_end -1))
         end
       | _ -> (* address is an IPv4 tuple *)
         let address = String.concat "." List.(map
           (fun i -> string_of_int (int_of_char buf.[i])) [ 4; 5; 6; 7 ] )
         in
         Socks4_request ({ port ; username ; address}
-          , String.sub buf (username_end + 4) (buf_len - username_end - 4))
+          , String.sub buf (username_end +1 + 4) (buf_len - username_end - 4 -1))
       end
     end
   | _ -> Invalid_request

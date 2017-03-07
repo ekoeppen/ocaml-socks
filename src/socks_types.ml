@@ -9,6 +9,8 @@ type socks5_connect =
   { port    : int
   ; address : string }
 
+type request_invalid_argument = Invalid_hostname
+
 type response_error =
   | Rejected
   | Incomplete_response (* The user should read more bytes and call again *)
