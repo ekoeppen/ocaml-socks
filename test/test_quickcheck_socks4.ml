@@ -1,4 +1,3 @@
-open Rresult
 open QCheck
 open QCheck.Test
 open OUnit2
@@ -11,7 +10,7 @@ let bigendian_port_of_int port =
     ;  port land 0xff          |> char_of_int |> String.make 1
     ]
 
-let test_making_a_request ctx =
+let test_making_a_request _ =
   check_exn @@ QCheck.Test.make ~count:10000
     ~name:"making a request is a thing"
     (triple string string small_int)

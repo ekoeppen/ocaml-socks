@@ -32,7 +32,7 @@ let make_socks4_request ~username hostname port =
     ; hostname ; "\x00"
     ]
 
-let string_of_socks5_authentication_method = function
+let string_of_socks5_authentication_method : socks5_authentication_method -> string = function
   | No_authentication_required -> "\x00"
   | Username_password _ -> "\x02"
   | No_acceptable_methods -> "\xFF"
@@ -139,7 +139,7 @@ let make_response ~(success : bool) = String.concat ""
   ; String.make 4 '\x00' (* IP *)
   ]
 
-let socks5_authentication_method_of_char = function
+let socks5_authentication_method_of_char : char -> socks5_authentication_method = function
   | '\x00' -> No_authentication_required
   | '\x03' -> Username_password ("", "")
   | _ -> No_acceptable_methods
@@ -148,7 +148,7 @@ let int_of_bigendian_port_tuple ~port_msb ~port_lsb =
   (int_of_char port_msb lsl 8) + int_of_char port_lsb
 
 let parse_socks5_connect buf =
-  let buf_len = Bytes.length buf in
+  let buf_len = String.length buf in
   begin match buf.[0], buf.[1], buf.[2], buf.[3] with
   | '\x05', (* VER - version *)
     '\x01', (* CMD - TODO we only implement CONNECT *)
@@ -173,7 +173,7 @@ let parse_socks5_connect buf =
   end
 
 let parse_request buf : request_result =
-  let buf_len = Bytes.length buf in
+  let buf_len = String.length buf in
   if buf_len < 3 then Incomplete_request else
   begin match buf.[0], buf.[1] with
    | '\x05', nmethods  -> (* SOCKS 5 CONNECT *)
@@ -197,26 +197,26 @@ let parse_request buf : request_result =
   | exception Invalid_argument _ -> Incomplete_request
   | '\x04' , '\x01' , port_msb, port_lsb -> (* SOCKS 4 CONNECT*)
     let username_offset = 8 in
-    begin match Bytes.index_from buf username_offset '\x00' with
+    begin match String.index_from buf username_offset '\x00' with
     | exception Not_found -> (* no user_id / user_id > 255 *)
         if buf_len < username_offset + 256
         then Incomplete_request
         else Invalid_request
     | username_end ->
       let port = int_of_bigendian_port_tuple ~port_msb:port_msb ~port_lsb:port_lsb in
-      let username = Bytes.sub_string buf username_offset (username_end - username_offset) in
+      let username = String.sub buf username_offset (username_end - username_offset) in
       begin match buf.[4], buf.[5], buf.[6] with
       | exception Invalid_argument _ ->
           Incomplete_request
       | '\x00' , '\x00', '\x00' ->
         let address_offset = 1 + username_end in
-        begin match Bytes.index_from buf address_offset '\x00' with
+        begin match String.index_from buf address_offset '\x00' with
         | exception Not_found -> (* no domain name / domain name > 255 *)
             if buf_len < address_offset + 256
             then Incomplete_request
             else Invalid_request
         | address_end ->
-          let address = Bytes.sub_string buf address_offset (address_end - address_offset) in
+          let address = String.sub buf address_offset (address_end - address_offset) in
           Socks4_request { port ; username ; address}
         end
       | _ -> (* address is an IPv4 tuple *)
@@ -231,7 +231,7 @@ let parse_request buf : request_result =
   end
 
 let parse_response result =
-  if 8 > Bytes.length result then
+  if 8 > String.length result then
     R.error Incomplete_response
   else
   if result.[0] = '\x00'

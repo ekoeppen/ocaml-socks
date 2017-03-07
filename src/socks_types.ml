@@ -26,7 +26,7 @@ type socks5_method_selection_request = socks5_authentication_method list
 type request_result =
   | Invalid_request
   | Incomplete_request (* The user should read more bytes and call again *)
-  | Socks5_method_selection_request of socks5_method_selection_request * bytes
+  | Socks5_method_selection_request of socks5_method_selection_request * string
   | Socks4_request of socks4_request
 
 type socks5_username_password_request_parse_result =

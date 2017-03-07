@@ -1,0 +1,20 @@
+version = "0.1"
+description = "SOCKS proxy"
+requires = "rresult"
+archive(byte) = "socks.cma"
+plugin(byte) = "socks.cma"
+archive(native) = "socks.cmxa"
+plugin(native) = "socks.cxms"
+
+exists_if = "socks.cma"
+package "socks_lwt" (
+ version = "0.1"
+ description = "SOCKS proxy"
+ requires = "rresult lwt lwt.ppx"
+ archive(byte) = "socks_lwt.cma"
+ plugin(byte) = "socks_lwt.cma"
+ archive(native) = "socks_lwt.cmxa"
+ plugin(native) = "socks_lwt.cmxs"
+ exists_if = "socks_lwt.cma"
+)
+
