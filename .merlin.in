@@ -1,3 +1,0 @@
-CMT %{prefix}%/build/**/_build/**
-S src/**
-S test/**

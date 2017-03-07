@@ -48,7 +48,7 @@ val socks5_authentication_method_of_char : char -> socks5_authentication_method
     value. If no matches were found, the value is [No_acceptable_methods]. *)
 
 val parse_socks5_connect :
-  bytes ->
+  string ->
   (socks5_connect, socks5_username_password_request_parse_result)
   Result.result
 (** [parse_socks5_connect buf] returns an OK result with port and hostname
@@ -56,14 +56,14 @@ val parse_socks5_connect :
     If anything is amiss, it will return [R.error] values, wrapping
     [Invalid_argument], [Invalid_request] and [Incomplete_request]. *)
 
-val parse_request : bytes -> request_result
+val parse_request : string -> request_result
 (** [parse_request buf] parses the given [buf] and returns a [request_result]
     which matches the content. For SOCKS5, the CONNECT method is supported.
     Either it is a SOCKS5 authentication request.
     Or, it's a SOCKS 4 CONNECT request, either using a domain name or an IPv4
     IP address. *)
 
-val parse_response : bytes -> (unit, response_error) Result.result
+val parse_response : string -> (unit, response_error) Result.result
 (** [parse_response result] returns an OK [Result.result] with a unit value on
     success, and a [Rejected] on failure. Bad values return an
     [Incomplete_response]. *)

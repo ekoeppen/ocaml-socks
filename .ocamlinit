@@ -1,0 +1,3 @@
+#require "rresult"
+#mod_use "src/socks_types.ml"
+#mod_use "src/socks.ml"
