@@ -69,7 +69,12 @@ val parse_request : string -> request_result
     Or, it's a SOCKS 4 CONNECT request, either using a domain name or an IPv4
     IP address. *)
 
-val parse_response : string -> (leftover_bytes, response_error) Result.result
+val parse_socks4_response : string -> (leftover_bytes, socks4_response_error) Result.result
+(** [parse_response result] returns an OK [Result.result] with a unit value on
+    success, and a [Rejected] on failure. Bad values return an
+    [Incomplete_response]. *)
+
+val parse_socks5_response : string -> socks5_response_result
 (** [parse_response result] returns an OK [Result.result] with a unit value on
     success, and a [Rejected] on failure. Bad values return an
     [Incomplete_response]. *)

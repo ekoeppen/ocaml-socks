@@ -2,7 +2,7 @@ open QCheck
 open QCheck.Test
 open OUnit2
 open Socks
-open Result
+open Socks_types
 
 let bigendian_port_of_int port =
   String.concat ""
@@ -53,7 +53,7 @@ let test_parsing_a_request _ =
           && out = { port = q_port
                    ; address = q_hostname
                    ; username = q_username} -> true
-      | Socks4_request (_, x) when x <> extraneous -> false
+      | Socks4_request (_, _) -> false
       | Invalid_request when 0 = String.length q_hostname
                           || 255 < String.length q_hostname -> true
       | Invalid_request

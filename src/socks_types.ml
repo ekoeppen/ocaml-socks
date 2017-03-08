@@ -11,7 +11,7 @@ type socks5_connect =
 
 type request_invalid_argument = Invalid_hostname
 
-type response_error =
+type socks4_response_error =
   | Rejected
   | Incomplete_response (* The user should read more bytes and call again *)
 
@@ -31,6 +31,13 @@ type request_result =
   | Incomplete_request (* The user should read more bytes and call again *)
   | Socks5_method_selection_request of socks5_method_selection_request * leftover_bytes
   | Socks4_request of socks4_request * leftover_bytes
+
+type socks5_response_result =
+  | Incomplete_response
+  | Bound_domain of string * int * leftover_bytes
+  | Bound_ipv4 of string * int * leftover_bytes
+  | Bound_ipv6 of string * int * leftover_bytes
+  | Invalid_response
 
 type socks5_username_password_request_parse_result =
   | Incomplete_request

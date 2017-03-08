@@ -16,10 +16,10 @@ let bigendian_port_of_int port =
     ;  port land 0xff          |> char_of_int |> String.make 1
     ]
 
-let make_socks4_request ~username ~hostname port =
+let make_socks4_request ~username ~hostname port : (string, request_invalid_argument) Result.result =
   let hostname_len = String.length hostname in
   if 255 < hostname_len || 0 = hostname_len then
-    R.error Invalid_hostname
+    R.error (Invalid_hostname : request_invalid_argument)
   else R.ok @@
   String.concat ""
     [ (* field 1: SOCKS version *)
@@ -67,10 +67,9 @@ let make_socks5_auth_response auth_method =
     ]
 
 let make_socks5_request hostname port =
-  (* TODO check if hostname > 255 *)
   let hostname_len = String.length hostname in
   if 255 < hostname_len || 0 = hostname_len then
-    R.error Invalid_hostname
+    R.error (Invalid_hostname : request_invalid_argument)
   else R.ok @@
   String.concat ""
   [ (* SOCKS5 version*)
@@ -246,10 +245,10 @@ let parse_request buf : request_result =
   end
   end
 
-let parse_response result =
+let parse_socks4_response result : (string, socks4_response_error) Result.result =
   let buf_len = String.length result in
   if 8 > buf_len then
-    R.error Incomplete_response
+    R.error (Incomplete_response : socks4_response_error)
   else
   if result.[0] = '\x00'
     && result.[1] = '\x5a'
@@ -265,3 +264,57 @@ let parse_response result =
       R.ok ""
   else
     R.error Rejected
+
+let parse_socks5_response buf : socks5_response_result =
+  let buf_len = String.length buf in
+  if buf_len < 4+1+2 then
+    Incomplete_response
+  else
+  begin match buf.[0], buf.[1], buf.[2], buf.[3] with
+  | '\x05', '\x00', '\x00', atyp ->
+    begin match atyp with
+    | '\x01' -> (* IPv4 *)
+        if buf_len < 4+2+4 then
+          Incomplete_response
+        else
+        let ipv4_address = String.concat "." List.(map
+          (fun i -> string_of_int (int_of_char buf.[i])) [ 4; 5; 6; 7 ] )
+        in
+        let port = int_of_bigendian_port_tuple ~port_msb:buf.[8] ~port_lsb:buf.[9] in
+        Bound_ipv4 (ipv4_address
+             , port
+             , String.sub buf (4+2+4) (buf_len-4-2-4)
+             )
+    | '\x03' -> (* DOMAINNAME *)
+      let domain_len = int_of_char buf.[4] in
+      if 0 = domain_len then
+        Invalid_response
+      else
+      if buf_len < 4+1+2+domain_len then
+        Incomplete_response
+      else
+      let domain = String.sub buf (4+1) domain_len in
+      let port = int_of_bigendian_port_tuple
+        ~port_msb:buf.[4+1+domain_len]
+        ~port_lsb:buf.[4+1+domain_len+1]
+      in
+      Bound_domain (domain
+           , port
+           , String.sub buf (4+1+domain_len+2) (buf_len -4 -1 - domain_len -2)
+           )
+    | '\x04' -> (* IPv6 *)
+      if buf_len < 4+2+128/4 then
+        Incomplete_response
+      else
+      let port = int_of_bigendian_port_tuple
+        ~port_msb:buf.[4+128/4]
+        ~port_lsb:buf.[4+128/4+1]
+      in
+      Bound_ipv6 (String.sub buf 4 (128/4)
+           , port (* TODO transform into a nice string *)
+           , String.(sub buf (4+128/4+2) (buf_len - 4 -128/4-2))
+           )
+    | _ -> Invalid_response
+    end
+  | _ -> Invalid_response
+  end

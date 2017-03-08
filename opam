@@ -1,4 +1,5 @@
 opam-version: "1.2"
+descr: "SOCKS 4A and SOCKS 5 (RFC 1928; RFC 1929) proxy library"
 maintainer: "root@localhost"
 authors: [ "none" ]
 license: "gopher://license.to.kill"
@@ -29,4 +30,3 @@ depends: [
   "rresult"
 ]
 available: [ ocaml-version >= "4.03.0" ]
-descr: "SOCKS proxy"
