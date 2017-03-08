@@ -187,8 +187,8 @@ let parse_socks5_connect buf =
 
 let parse_request buf : request_result =
   let buf_len = String.length buf in
-  if buf_len < 3 then Incomplete_request else
   begin match buf.[0], buf.[1] with
+   | exception Invalid_argument _ -> Incomplete_request
    | '\x05', nmethods  -> (* SOCKS 5 CONNECT *)
      let nmethods = int_of_char nmethods in
      if nmethods < 1 then Invalid_request
@@ -197,14 +197,18 @@ let parse_request buf : request_result =
      if buf_len < method_selection_end
      then Incomplete_request
      else
-     let rec auth_methods acc n =
+     let rec f_auth_methods acc n =
        if n > 0
-       then auth_methods (socks5_authentication_method_of_char buf.[1+n] :: acc) (n-1)
+       then f_auth_methods (socks5_authentication_method_of_char buf.[1+n] :: acc) (n-1)
        else acc
      in
-     Socks5_method_selection_request
-       ( (auth_methods [] nmethods),
-         (String.sub buf method_selection_end (buf_len - method_selection_end) ))
+     let auth_methods = f_auth_methods [] nmethods in
+     if List.length auth_methods <> 0 && not @@ List.mem No_acceptable_methods auth_methods
+     then
+       Socks5_method_selection_request
+         ( auth_methods,
+           (String.sub buf method_selection_end (buf_len - method_selection_end) ))
+     else Invalid_request
    | _ -> 
   begin match buf.[0], buf.[1], buf.[2], buf.[3] with
   | exception Invalid_argument _ -> Incomplete_request

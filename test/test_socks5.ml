@@ -11,12 +11,15 @@ let bigendian_port_of_int port =
     ;  port land 0xff          |> char_of_int |> String.make 1
     ]
 
+let small_string = QCheck.Gen.string_size @@ QCheck.Gen.int_range 0 0xff |> QCheck.make
+let charz = QCheck.Gen.(int_range 1 0xff |> map char_of_int) |> QCheck.make
+
 let test_making_a_request _ =
   check_exn @@ QCheck.Test.make ~count:10000
     ~name:"making a request is a thing"
     (pair string small_int)
     @@ (fun (hostname, port) ->
-      (begin match make_socks5_request hostname port with
+      begin match make_socks5_request hostname port with
        | Ok data ->  data = "\x05\x01\x00" (* VER CMD RSV = [5; CONNECT; reserved] *)
                           ^ "\x03" (* ATYP = DOMAINNAME *)
                           ^ String.(length hostname |> char_of_int |> make 1)
@@ -26,13 +29,52 @@ let test_making_a_request _ =
            when 0 = String.length hostname  
            || 255 < String.length hostname -> true
        | _ -> false
-       end
-      );
+      end
     )
+;;
+
+let test_parse_request _ =
+  check_exn @@ QCheck.Test.make ~count:10000
+  ~name:"testing socks5: parse_request"
+  (pair small_string string)
+  @@ (fun (methods, extraneous) ->
+     let data = "\x05"
+              ^ String.(length methods |> char_of_int |> make 1)
+                ^ methods
+              ^ extraneous
+     in let data_len = String.length data in
+     begin match parse_request data with
+     | Socks5_method_selection_request ([], _) ->
+         false (* This should be an Invalid_request *)
+     | Socks5_method_selection_request (mthds, _)
+       when List.(length mthds <> String.length methods) ->
+         false
+     | Socks5_method_selection_request (_, x)
+       when x <> extraneous -> false
+
+     | Socks5_method_selection_request (authlst, x)
+       when not @@ List.mem No_acceptable_methods authlst
+            && authlst <> []
+            && x = extraneous -> true
+         (*when there is at least one auth method, and the extraneous matches *)
+
+     | Incomplete_request
+       when data_len < 1+1 + String.(length methods + length extraneous)
+       -> true (* Up to and including missing one byte we ask for more *)
+
+     | Incomplete_request -> false
+     | Socks4_request _ -> false
+
+     | Invalid_request ->
+         true (* Expected behavior is to reject invalid requests; hence true *)
+     | _ -> false
+     end
+     )
 ;;
 
 let suite = [
   "make_socks5_request" >:: test_making_a_request;
+  "socks5: parse_request" >:: test_parse_request;
   ]
 (*
 open OUnit2
