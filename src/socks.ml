@@ -45,17 +45,16 @@ let string_of_socks5_reply_field = function
   | Succeeded -> "\x00"
   | Failure -> "\xFF" (* TODO look this up*)
 
-let make_socks5_auth_request ~username ~password =
+let make_socks5_auth_request ~(username_password:bool) =
   String.concat ""
     [ (* field 1: SOCKS version *)
       "\x05"
       (* NMETHODS - number of METHODS *)
     ; "\x01"
-    ; string_of_socks5_authentication_method @@ Username_password ("", "")
-    ; String.length username |> char_of_int |> String.make 1
-    ; username
-    ; String.length password |> char_of_int |> String.make 1
-    ; password
+    ; string_of_socks5_authentication_method @@
+      if username_password then
+        Username_password ("", "")
+      else No_authentication_required
     ]
 
 let make_socks5_auth_response auth_method =
@@ -65,6 +64,40 @@ let make_socks5_auth_response auth_method =
       (* METHOD chosen by the server *)
     ; string_of_socks5_authentication_method auth_method
     ]
+
+let make_socks5_username_password_request ~username ~password =
+  String.concat ""
+  [ (* SOCKS 5 version *)
+    "\x05"
+    (* ULEN - username length *)
+  ; username |> String.length |> char_of_int |> String.make 1
+    (* UNAME - username *)
+  ; username
+    (* PLEN - password length *)
+  ; password |> String.length |> char_of_int |> String.make 1
+    (* PASSWD - password *)
+  ; password
+  ]
+
+let parse_socks5_username_password_request buf : socks5_username_password_request_parse_result =
+  let buf_len = String.length buf in
+  if buf_len < 3 then Incomplete_request
+  else
+  begin match buf.[0], buf.[1] with
+  | '\x05', ulen ->
+     let ulen = int_of_char ulen in
+     if buf_len < 3 + ulen then Incomplete_request
+     else
+     let username = String.sub buf 2 ulen in
+     let plen = int_of_char buf.[1+1+ulen] in
+     if buf_len < 3 + ulen + plen then Incomplete_request
+     else
+     let password = String.sub buf (3 + ulen) ( 3 + ulen + plen) in
+     Username_password (username , password,
+                        String.(sub buf (3 + ulen + plen) (buf_len - 3 - ulen - plen))
+     )
+  | _ -> Invalid_request
+  end
 
 let make_socks5_request hostname port =
   let hostname_len = String.length hostname in
@@ -104,41 +137,7 @@ let make_socks5_response ~bnd_port reply_field =
   ; bigendian_port_of_int bnd_port
   ]
 
-let make_socks5_username_password_request ~username ~password =
-  String.concat ""
-  [ (* SOCKS 5 version *)
-    "\x05"
-    (* ULEN - username length *)
-  ; username |> String.length |> char_of_int |> String.make 1
-    (* UNAME - username *)
-  ; username
-    (* PLEN - password length *)
-  ; password |> String.length |> char_of_int |> String.make 1
-    (* PASSWD - password *) 
-  ; password
-  ]
-
-let parse_socks5_username_password_request buf : socks5_username_password_request_parse_result =
-  let buf_len = String.length buf in
-  if buf_len < 3 then Incomplete_request
-  else
-  begin match buf.[0], buf.[1] with
-  | '\x05', ulen ->
-     let ulen = int_of_char ulen in
-     if buf_len < 3 + ulen then Incomplete_request
-     else
-     let username = String.sub buf 2 ulen in
-     let plen = int_of_char buf.[1+1+ulen] in
-     if buf_len < 3 + ulen + plen then Incomplete_request
-     else
-     let password = String.sub buf (3 + ulen) ( 3 + ulen + plen) in
-     Username_password (username , password,
-                        String.(sub buf (3 + ulen + plen) (buf_len - 3 - ulen - plen))
-     )
-  | _ -> Invalid_request
-  end
-
-let make_response ~(success : bool) = String.concat ""
+let make_socks4_response ~(success : bool) = String.concat ""
   (* field 1: null byte*)
   [ "\x00"
   (* field 2: status, 1 byte 0x5a = granted; 0x5b = rejected/failed : *)

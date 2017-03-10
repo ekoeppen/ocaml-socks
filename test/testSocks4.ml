@@ -25,11 +25,11 @@ let test_make_request _ =
 
 let test_make_response _ =
   let empty_ip_and_port = "\x00\x00" ^ "\x00\x00\x00\x00" in
-  assert_equal (make_response ~success:true)
+  assert_equal (make_socks4_response ~success:true)
   ("\x00\x5a" ^ empty_ip_and_port)
   ;;
   let empty_ip_and_port = "\x00\x00" ^ "\x00\x00\x00\x00" in
-  assert_equal (make_response ~success:false)
+  assert_equal (make_socks4_response ~success:false)
   ("\x00\x5b" ^ empty_ip_and_port)
   ;;
 
