@@ -1,15 +1,15 @@
 version = "0.1"
-description = "SOCKS proxy"
+description = "SOCKS proxy handling"
 requires = "rresult"
 archive(byte) = "socks.cma"
 plugin(byte) = "socks.cma"
 archive(native) = "socks.cmxa"
 plugin(native) = "socks.cxms"
-
 exists_if = "socks.cma"
+
 package "socks_lwt" (
- version = "0.1"
- description = "SOCKS proxy"
+ version = "%%VERSION_NUM%%"
+ description = "Lwt wrappers for SOCKS proxy handling"
  requires = "rresult lwt lwt.ppx"
  archive(byte) = "socks_lwt.cma"
  plugin(byte) = "socks_lwt.cma"

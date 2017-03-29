@@ -41,8 +41,12 @@ val parse_socks4_response : string -> (leftover_bytes, socks4_response_error) Re
 val make_socks5_auth_request : username_password:bool -> string
 (** [make_socks5_auth_request ~username_password] returns a binary
     string which represents a SOCKS5 authentication request.
+    In the protocol this is a list of authentication modes that the client is willing to use, but in our API it's a choice between "no auth methods" and "username/password".
 
     This library only supports "no auth" and "username/password" authentication.
+*)
+
+(** [parse_socks5_auth_request data] is contained within [parse_request]
 *)
 
 val make_socks5_auth_response : socks5_authentication_method -> string
@@ -50,9 +54,11 @@ val make_socks5_auth_response : socks5_authentication_method -> string
     represents a SOCKS5 authentication response. *)
 
 val make_socks5_username_password_request :
-  username:string -> password:string -> string
+  username:string -> password:string -> (string,unit) Result.result
 (** [make_socks5_username_password_request ~username ~password] returns a
-    binary string which represents a SOCKS5 password request from [RFC1929]. *)
+    binary string which represents a SOCKS5 password request from [RFC1929].
+    The function fails if either of the strings are longer than 255 bytes, or contain 0 bytes.
+*)
 
 val parse_socks5_username_password_request :
   string -> socks5_username_password_request_parse_result

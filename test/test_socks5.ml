@@ -14,6 +14,57 @@ let bigendian_port_of_int port =
 let small_string = QCheck.Gen.string_size @@ QCheck.Gen.int_range 0 0xff |> QCheck.make
 let charz = QCheck.Gen.(int_range 1 0xff |> map char_of_int) |> QCheck.make
 
+let test_make_socks5_auth_request _ =
+  begin match
+    make_socks5_auth_request ~username_password:true
+  , make_socks5_auth_request ~username_password:false
+  with
+  | "\x05\x01\x02"
+  , "\x05\x01\x00" -> ()
+  | _ -> failwith ("make_socks5_auth_request doesn't work")
+  end
+
+let test_make_socks5_auth_response _ =
+  begin match
+    make_socks5_auth_response No_authentication_required
+  , make_socks5_auth_response (Username_password ("" , ""))
+  , make_socks5_auth_response No_acceptable_methods
+  with
+  | "\x05\x00"
+  , "\x05\x02"
+  , "\x05\xff"
+  -> ()
+  | _ -> failwith "make_socks5_auth_response doesn't work"
+  end
+
+let test_make_socks5_username_password_request _ =
+  begin match make_socks5_username_password_request
+              ~username:"username"
+              ~password:"password"
+  with
+  | Ok "\x05\x08username\x08password" -> ()
+  | _ ->  failwith "test_make_socks5_username_password_request doesn't work"
+  end
+
+let test_parse_socks5_username_password_request _ =
+  check_exn @@ QCheck.Test.make ~count:10000
+  ~name:"parse_socks5_username_password_request"
+  (triple small_string small_string small_string)
+  @@ (fun (username,password,extraneous) ->
+    begin match (make_socks5_username_password_request ~username ~password) with
+    | Error () when username = "" -> true
+    | Error () when password = "" -> true
+    | Error () when 255 < String.length username -> true
+    | Error () when 255 < String.length password -> true
+    | Ok req ->
+      begin match parse_socks5_username_password_request (req ^ extraneous) with
+      | Username_password (u, p, x) when u=username && p=password && x=extraneous ->true
+      | _ -> assert false
+      end
+    | _ -> assert false
+    end
+  )
+
 let test_making_a_request _ =
   check_exn @@ QCheck.Test.make ~count:10000
     ~name:"making a request is a thing"
@@ -73,8 +124,11 @@ let test_parse_request _ =
 ;;
 
 let suite = [
-  "make_socks5_request" >:: test_making_a_request;
+  "socks5: make_socks5_auth_request" >:: test_make_socks5_auth_request;
   "socks5: parse_request" >:: test_parse_request;
+  "socks5: make_socks5_username_password_request" >:: test_make_socks5_username_password_request;
+  "socks5: parse_socks5_username_password_request" >:: test_parse_socks5_username_password_request;
+  "socks5: make_socks5_request" >:: test_making_a_request;
   ]
 (*
 open OUnit2

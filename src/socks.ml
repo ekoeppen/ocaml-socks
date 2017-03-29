@@ -57,6 +57,10 @@ let make_socks5_auth_request ~(username_password:bool) =
       else No_authentication_required
     ]
 
+(* let parse_socks5_auth_request data
+   see [parse_request]
+*)
+
 let make_socks5_auth_response auth_method =
   String.concat ""
     [ (* SOCKS version*)
@@ -66,6 +70,12 @@ let make_socks5_auth_response auth_method =
     ]
 
 let make_socks5_username_password_request ~username ~password =
+  begin match String.(length username , length password) with
+  | 0 , _
+  | _ , 0 -> R.error ()
+  | x , y when x > 255 || y > 255 -> R.error ()
+  | _ ->
+  R.ok @@
   String.concat ""
   [ (* SOCKS 5 version *)
     "\x05"
@@ -78,12 +88,14 @@ let make_socks5_username_password_request ~username ~password =
     (* PASSWD - password *)
   ; password
   ]
+  end
 
 let parse_socks5_username_password_request buf : socks5_username_password_request_parse_result =
   let buf_len = String.length buf in
   if buf_len < 3 then Incomplete_request
   else
   begin match buf.[0], buf.[1] with
+  | exception Invalid_argument _ -> Incomplete_request
   | '\x05', ulen ->
      let ulen = int_of_char ulen in
      if buf_len < 3 + ulen then Incomplete_request
@@ -92,7 +104,7 @@ let parse_socks5_username_password_request buf : socks5_username_password_reques
      let plen = int_of_char buf.[1+1+ulen] in
      if buf_len < 3 + ulen + plen then Incomplete_request
      else
-     let password = String.sub buf (3 + ulen) ( 3 + ulen + plen) in
+     let password = String.sub buf (3 + ulen) plen in
      Username_password (username , password,
                         String.(sub buf (3 + ulen + plen) (buf_len - 3 - ulen - plen))
      )
