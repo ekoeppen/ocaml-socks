@@ -53,6 +53,7 @@ let requests _ =
     | _ -> false
     end
   | Error Invalid_hostname -> false
+  | Error Invalid_port -> false
   end
   |> assert_bool
   "self-check request" ;;

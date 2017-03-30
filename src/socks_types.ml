@@ -9,7 +9,7 @@ type socks5_connect =
   { port    : int
   ; address : string }
 
-type request_invalid_argument = Invalid_hostname
+type request_invalid_argument = Invalid_hostname | Invalid_port
 
 type socks4_response_error =
   | Rejected

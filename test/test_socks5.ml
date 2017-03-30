@@ -123,73 +123,81 @@ let test_parse_request _ =
      )
 ;;
 
+let test_parse_socks5_connect _ =
+  let header = "\x05\x01\x00\x03" in
+  check_exn @@ QCheck.Test.make ~count:10000
+  ~name:"testing socks5: parse_socks5_connect"
+  (quad small_int small_int small_string small_string)
+  @@ (fun (truncation, port, address, extraneous) ->
+  let connect_string = header
+                     ^ (char_of_int String.(length address)|> String.make 1)
+                     ^ address
+                     ^ (bigendian_port_of_int port)
+                     ^ extraneous
+  in
+  let valid_request_len = String.(length header) + 1 + String.(length address) + 2 in
+  let truncated_connect_string = String.sub connect_string 0 (min String.(length connect_string) truncation) in
+  begin match parse_socks5_connect connect_string with
+  | Error Invalid_request when 0 = String.length address -> true
+  | Ok ({port = parsed_port; address = parsed_address}, parsed_leftover)
+    when port = parsed_port
+      && address = parsed_address
+      && parsed_leftover = extraneous
+    ->
+    begin match parse_socks5_connect truncated_connect_string with
+    | Error Incomplete_request when truncation < valid_request_len -> true
+    | Ok ({port = truncated_port; address = truncated_address}, truncated_leftover)
+      when port = truncated_port
+        && address = truncated_address
+        && truncated_leftover = String.sub extraneous 0 (min String.(length extraneous) (truncation-valid_request_len))
+      -> true
+    | _ -> false
+    end
+  | Error Incomplete_request -> false
+  | _ -> false
+  end
+  )
+;;
+
+let test_make_socks5_response _ =
+  check_exn @@ QCheck.Test.make ~count:10000
+  ~name:"testing socks5: make_socks5_response"
+  (pair small_int bool)
+  @@ (fun (bnd_port, reply) ->
+    let reply = begin match reply with true -> Succeeded | false -> Socks_types.Failure end in
+    begin match make_socks5_response ~bnd_port reply with
+    | Ok _ -> true
+    | Error () -> false
+    end
+  )
+;;
+
+let test_parse_socks5_response_ipv4 _ =
+  (* this test only deals with IPv4 addresses *)
+  let header = "\x05\x00\x00\x01" in
+  check_exn @@ QCheck.Test.make ~count:10000
+  ~name:"testing socks5: parse_socks5_response"
+  (triple int small_int small_string)
+  @@ (fun (ip_int, port, extraneous) ->
+    let ip = Ipaddr.V4.(of_int32 (Int32.of_int ip_int) |> to_bytes) in
+    let response = header ^ ip ^ (bigendian_port_of_int port) ^ extraneous in
+    begin match parse_socks5_response response with
+    | Bound_ipv4 (parsed_ip, parsed_port, parsed_leftover)
+      when ip = Ipaddr.V4.(begin match of_string parsed_ip with Some i -> to_bytes i end)
+        && parsed_port = port
+        && parsed_leftover = extraneous -> true
+    | _ -> false
+    end
+  )
+;;
+
 let suite = [
   "socks5: make_socks5_auth_request" >:: test_make_socks5_auth_request;
   "socks5: parse_request" >:: test_parse_request;
   "socks5: make_socks5_username_password_request" >:: test_make_socks5_username_password_request;
   "socks5: parse_socks5_username_password_request" >:: test_parse_socks5_username_password_request;
   "socks5: make_socks5_request" >:: test_making_a_request;
+  "socks5: parse_socks5_connect" >:: test_parse_socks5_connect;
+  "socks5: make_socks5_response" >:: test_make_socks5_response;
+  "socks5: parse_socks5_response (ipv4)" >:: test_parse_socks5_response_ipv4;
   ]
-(*
-open OUnit2
-open Socks
-open Socks_types
-open Rresult
-
-let is_invalid (r : request_result) =
-  r = Invalid_request
-
-let is_incomplete (r : request_result) =
-  r = Incomplete_request
-
-let is_request = function Ok _ -> true | _ -> false
-
-let test_make_request _ =
-  let username = "myusername" in
-  let hostname = "example.com" in
-  assert_bool "example.com:4321"
-    (make_socks5_request ~username "example.com" 4321
-    = "\x04\x01"
-    ^ "\x10\xe1" (* port *)
-    ^ "\x00\x00\x00\xff"
-    ^ username ^ "\x00"
-    ^ hostname ^ "\x00")
-;;
-
-let test_make_response _ =
-  let empty_ip_and_port = "\x00\x00" ^ "\x00\x00\x00\x00" in
-  assert_equal (make_response ~success:true)
-  ("\x00\x5a" ^ empty_ip_and_port)
-  ;;
-  let empty_ip_and_port = "\x00\x00" ^ "\x00\x00\x00\x00" in
-  assert_equal (make_response ~success:false)
-  ("\x00\x5b" ^ empty_ip_and_port)
-  ;;
-
-let invalid_requests _ =
-  assert_bool "invalid protocol" (is_invalid (parse_request "\x00\x001234567")) ;;
-
-let incomplete_requests _ =
-  "\x04"
-  |> parse_request |> is_incomplete |> assert_bool
-  "8 bytes" ;;
-
-let requests _ =
-  let r = make_socks4_request ~username:"user" "host" 515 in
-  begin match parse_request (r ^ "X") with
-  | Socks4_request (pr , "X") ->
-      (pr.port = 515 && pr.username = "user"
-       && pr.address = "host")
-  | _ -> false
-  end |> assert_bool
-  "self-check request" ;;
-
-(** TODO: OUnit2 should detect test cases automatically. *)
-let suite = [
-    "make_request" >:: test_make_request;
-    "make_response" >:: test_make_response;
-    "parse_request: invalid_requests" >:: invalid_requests;
-    "parse_request: incomplete_requests" >:: incomplete_requests;
-    "is_request" >:: requests;
-  ]
-*)

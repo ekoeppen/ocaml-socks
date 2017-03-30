@@ -87,7 +87,7 @@ val parse_socks5_connect :
     If anything is amiss, it will return [R.error] values, wrapping
     [Invalid_argument], [Invalid_request] and [Incomplete_request]. *)
 
-val make_socks5_response : bnd_port:int -> socks5_reply_field -> string
+val make_socks5_response : bnd_port:int -> socks5_reply_field -> (string, unit) result
 (** [make_socks5_response ~bnd_port reply_field] returns a binary string which
     represents a SOCKS5 response. *)
 

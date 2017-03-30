@@ -10,24 +10,33 @@ open Rresult
 include Socks_types
 
 let bigendian_port_of_int port =
-  String.concat ""
+  begin match port with
+  | x when 0 <= x && x <= 0xFFFF ->
+    R.ok @@
+    String.concat ""
     [
       (port land 0xff00) lsr 8 |> char_of_int |> String.make 1
     ;  port land 0xff          |> char_of_int |> String.make 1
     ]
+  | _ -> R.error ()
+  end
 
-let make_socks4_request ~username ~hostname port : (string, request_invalid_argument) Result.result =
+let make_socks4_request ~username ~hostname port : (string, request_invalid_argument) result =
   let hostname_len = String.length hostname in
-  if 255 < hostname_len || 0 = hostname_len then
-    R.error (Invalid_hostname : request_invalid_argument)
-  else R.ok @@
-  String.concat ""
+  if 0 == hostname_len || 255 < hostname_len
+  then R.error (Invalid_hostname : request_invalid_argument)
+  else R.ok ()
+  >>= fun _ ->
+  bigendian_port_of_int port
+  |> R.reword_error (fun () -> Invalid_port)
+  >>= fun port ->
+  R.ok @@ String.concat ""
     [ (* field 1: SOCKS version *)
       "\x04"
       (* field 2: command code: "connect stream": *)
     ; "\x01"
       (* field 3: bigendian port: *)
-    ; bigendian_port_of_int port
+    ; port
       (* field 4: invalid ip: *)
     ; "\x00\x00\x00\xff"
       (* field 5: user ID string followed by terminator: *)
@@ -115,7 +124,12 @@ let make_socks5_request hostname port =
   let hostname_len = String.length hostname in
   if 255 < hostname_len || 0 = hostname_len then
     R.error (Invalid_hostname : request_invalid_argument)
-  else R.ok @@
+  else R.ok ()
+  >>= fun () ->
+  bigendian_port_of_int port
+  |> R.reword_error (fun () -> Invalid_port)
+  >>= fun port ->
+  R.ok @@
   String.concat ""
   [ (* SOCKS5 version*)
     "\x05"
@@ -130,10 +144,13 @@ let make_socks5_request hostname port =
   ; String.(length hostname) |> char_of_int |> String.make 1
   ; hostname
     (* port *)
-  ; bigendian_port_of_int port
+  ; port
   ]
 
 let make_socks5_response ~bnd_port reply_field =
+  bigendian_port_of_int bnd_port
+  >>= fun bnd_port ->
+  R.ok @@
   String.concat ""
   [ (* SOCKS version *)
     "\x05"
@@ -146,7 +163,7 @@ let make_socks5_response ~bnd_port reply_field =
     (* BND.ADDR - TODO handle ATYP *)
   ; "\x00\x00\x00\x00"
     (* BND.PORT - TODO handle ATYP *)
-  ; bigendian_port_of_int bnd_port
+  ; bnd_port
   ]
 
 let make_socks4_response ~(success : bool) = String.concat ""
@@ -191,7 +208,7 @@ let parse_socks5_connect buf =
                    ~port_msb:buf.[5+atyp_len]
                    ~port_lsb:buf.[5+atyp_len+1]
       in
-      R.ok ({ port ; address }, String.sub buf (5+atyp_len+2) (buf_len-atyp_len-2) )
+      R.ok ({ port ; address }, String.sub buf (4+1+atyp_len+2) (buf_len-4-1-atyp_len-2) )
   | exception Invalid_argument _ -> R.error Incomplete_request
   | _ -> R.error Invalid_request
   end
