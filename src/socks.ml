@@ -52,7 +52,32 @@ let string_of_socks5_authentication_method : socks5_authentication_method -> str
 
 let string_of_socks5_reply_field = function
   | Succeeded -> "\x00"
-  | Failure -> "\xFF" (* TODO look this up*)
+  | General_socks_server_failure -> "\x01"
+  | Connection_not_allowed_by_ruleset -> "\x02"
+  | Network_unreachable -> "\x03"
+  | Host_unreachable -> "\x04"
+  | Connection_refused -> "\x05"
+  | TTL_expired -> "\x06"
+  | Command_not_supported -> "\x07"
+  | Address_type_not_supported -> "\x08"
+  | Unassigned -> "\xFF"
+
+let reply_field_of_char = function
+  | '\x00' -> Succeeded
+  | '\x01' -> General_socks_server_failure
+  | '\x02' -> Connection_not_allowed_by_ruleset
+  | '\x03' -> Network_unreachable
+  | '\x04' -> Host_unreachable
+  | '\x05' -> Connection_refused
+  | '\x06' -> TTL_expired
+  | '\x07' -> Command_not_supported
+  | '\x08' -> Address_type_not_supported
+  | '\x09'..'\xff' -> Unassigned
+
+let string_of_socks5_request = function
+  | Connect _ -> "\x01"
+  | Bind    _ -> "\x02"
+  | UDP_associate _ -> "\x03"
 
 let make_socks5_auth_request ~(username_password:bool) =
   String.concat ""
@@ -78,26 +103,29 @@ let make_socks5_auth_response auth_method =
     ; string_of_socks5_authentication_method auth_method
     ]
 
+let encode_str str : (string, unit) result =
+  (* add uint8_t length prefix, error if not 0 < str < 256 *)
+  if String.(length str < 1 || 255 < length str)
+  then R.error ()
+  else
+  R.ok @@
+    String.(length str |> char_of_int |> make 1)
+  ^ str
+
 let make_socks5_username_password_request ~username ~password =
-  begin match String.(length username , length password) with
-  | 0 , _
-  | _ , 0 -> R.error ()
-  | x , y when x > 255 || y > 255 -> R.error ()
-  | _ ->
+  encode_str username >>= fun username ->
+  encode_str password >>= fun password ->
   R.ok @@
   String.concat ""
   [ (* SOCKS 5 version *)
     "\x05"
     (* ULEN - username length *)
-  ; username |> String.length |> char_of_int |> String.make 1
     (* UNAME - username *)
   ; username
     (* PLEN - password length *)
-  ; password |> String.length |> char_of_int |> String.make 1
     (* PASSWD - password *)
   ; password
   ]
-  end
 
 let parse_socks5_username_password_request buf : socks5_username_password_request_parse_result =
   let buf_len = String.length buf in
@@ -120,38 +148,51 @@ let parse_socks5_username_password_request buf : socks5_username_password_reques
   | _ -> Invalid_request
   end
 
-let make_socks5_request hostname port =
-  let hostname_len = String.length hostname in
-  if 255 < hostname_len || 0 = hostname_len then
-    R.error (Invalid_hostname : request_invalid_argument)
-  else R.ok ()
-  >>= fun () ->
-  bigendian_port_of_int port
+let serialize_address =
+  begin function
+  | IPv4_address ipv4 -> R.ok ["\x01"; Ipaddr.V4.to_bytes ipv4 ]
+  | Domain_address hostname ->
+      encode_str hostname
+      >>= fun hostname ->
+      R.ok ["\x03"; hostname]
+  | IPv6_address ipv6 -> R.ok ["\x04"; Ipaddr.V6.to_bytes ipv6 ]
+  end
+
+let make_socks5_request request =
+  (* Serialize the address to bytes: *)
+  begin match request with
+  | Connect       {address; _ }
+  | Bind          {address; _ }
+  | UDP_associate {address; _ }
+  -> address
+  end
+  |> serialize_address |> R.reword_error (fun () -> Invalid_hostname)
+  >>= fun serialized_address ->
+  bigendian_port_of_int (match request with Connect {port;_}
+                                          | Bind {port;_}
+                                          | UDP_associate {port;_} -> port)
   |> R.reword_error (fun () -> Invalid_port)
   >>= fun port ->
   R.ok @@
-  String.concat ""
+  String.concat "" @@
   [ (* SOCKS5 version*)
     "\x05"
     (* CMD (we only implement 'connect' *)
-  ; "\x01"
+  ; string_of_socks5_request request
     (* RSV - reserved *)
   ; "\x00"
-    (* ATYP - address type (ipv4; ipv6; domain name) *)
-    (* (we only implement 'domainname' *)
-  ; "\x03"
-    (* address *)
-  ; String.(length hostname) |> char_of_int |> String.make 1
-  ; hostname
-    (* port *)
-  ; port
-  ]
+    (* DST.ADDR *)
+  ] @ serialized_address
+    (* DST.PORT *)
+  @ [ port ]
 
-let make_socks5_response ~bnd_port reply_field =
+let make_socks5_response reply_field ~bnd_port address =
+  serialize_address address
+  >>= fun address ->
   bigendian_port_of_int bnd_port
   >>= fun bnd_port ->
   R.ok @@
-  String.concat ""
+  String.concat "" @@
   [ (* SOCKS version *)
     "\x05"
     (* REP - reply field *)
@@ -159,12 +200,10 @@ let make_socks5_response ~bnd_port reply_field =
     (* RSV - reserved *)
   ; "\x00"
     (* ATYP - adddress type *)
-  ; "\x01" (* TODO: we only send IPv4 *)
-    (* BND.ADDR - TODO handle ATYP *)
-  ; "\x00\x00\x00\x00"
-    (* BND.PORT - TODO handle ATYP *)
-  ; bnd_port
-  ]
+    (* BND.ADDR *)
+  ] @ address
+    (* BND.PORT *)
+  @ [ bnd_port ]
 
 let make_socks4_response ~(success : bool) = String.concat ""
   (* field 1: null byte*)
@@ -297,56 +336,39 @@ let parse_socks4_response result : (string, socks4_response_error) Result.result
   else
     R.error Rejected
 
-let parse_socks5_response buf : socks5_response_result =
+let parse_socks5_response buf : (socks5_reply_field * socks5_struct * leftover_bytes, socks5_response_error) result =
   let buf_len = String.length buf in
   if buf_len < 4+1+2 then
-    Incomplete_response
+    R.error Incomplete_response
   else
   begin match buf.[0], buf.[1], buf.[2], buf.[3] with
-  | '\x05', '\x00', '\x00', atyp ->
+  | '\x05', ('\x00'..'\x08' as reply_field), '\x00', ('\x01'|'\x03'|'\x04' as atyp) ->
     begin match atyp with
-    | '\x01' -> (* IPv4 *)
-        if buf_len < 4+2+4 then
-          Incomplete_response
-        else
-        let ipv4_address = String.concat "." List.(map
-          (fun i -> string_of_int (int_of_char buf.[i])) [ 4; 5; 6; 7 ] )
-        in
-        let port = int_of_bigendian_port_tuple ~port_msb:buf.[8] ~port_lsb:buf.[9] in
-        Bound_ipv4 (ipv4_address
-             , port
-             , String.sub buf (4+2+4) (buf_len-4-2-4)
-             )
-    | '\x03' -> (* DOMAINNAME *)
+    | '\x01' when 4+4+2 <= buf_len -> (* IPv4 *)
+        let address = IPv4_address (match Ipaddr.V4.of_bytes @@ String.sub buf 4 4 with Some ip -> ip) in
+        R.ok (address, (*port offset:*) 4+4)
+    | '\x03' when 4+1+2 <= buf_len -> (* DOMAINNAME *)
       let domain_len = int_of_char buf.[4] in
-      if 0 = domain_len then
-        Invalid_response
+      if 0 = domain_len
+      then R.error Invalid_response
       else
       if buf_len < 4+1+2+domain_len then
-        Incomplete_response
+        R.error Incomplete_response
       else
-      let domain = String.sub buf (4+1) domain_len in
-      let port = int_of_bigendian_port_tuple
-        ~port_msb:buf.[4+1+domain_len]
-        ~port_lsb:buf.[4+1+domain_len+1]
-      in
-      Bound_domain (domain
-           , port
-           , String.sub buf (4+1+domain_len+2) (buf_len -4 -1 - domain_len -2)
-           )
-    | '\x04' -> (* IPv6 *)
-      if buf_len < 4+2+128/4 then
-        Incomplete_response
-      else
-      let port = int_of_bigendian_port_tuple
-        ~port_msb:buf.[4+128/4]
-        ~port_lsb:buf.[4+128/4+1]
-      in
-      Bound_ipv6 (String.sub buf 4 (128/4)
-           , port (* TODO transform into a nice string *)
-           , String.(sub buf (4+128/4+2) (buf_len - 4 -128/4-2))
-           )
-    | _ -> Invalid_response
+      let domain = Domain_address String.(sub buf (4+1) domain_len) in
+      R.ok (domain , 4+1+domain_len)
+    | '\x04' when 4+16+2 <= buf_len -> (* IPv6 *)
+      let sizeof_ipv6 = 16 (*128/8*) in
+      let address = IPv6_address (match Ipaddr.V6.of_bytes @@ String.sub buf 4 sizeof_ipv6 with Some ip -> ip) in
+      R.ok (address, 4+sizeof_ipv6)
+    | ('\x01'|'\x03'|'\x04') -> (* when-guards are used for size constraints above *)
+      R.error Incomplete_response
     end
-  | _ -> Invalid_response
+    >>= fun (address, port_offset) ->
+    let port = int_of_bigendian_port_tuple
+      ~port_msb:buf.[port_offset]
+      ~port_lsb:buf.[port_offset+1]
+    in
+    R.ok ((reply_field_of_char reply_field), {address; port}, String.sub buf (port_offset+2) (buf_len-port_offset-2))
+  | _ -> R.error Invalid_response
   end

@@ -21,7 +21,7 @@ val parse_request : string -> request_result
 
 (** {2:basic Functions specific to SOCKS 4A} *)
 
-val make_socks4_request : username:string -> hostname:string -> int -> (string, request_invalid_argument) Result.result
+val make_socks4_request : username:string -> hostname:string -> int -> (string, request_invalid_argument) result
 (** [make_socks4_request ~username ~hostname port] returns a binary string
     which represents a SOCKS4A request.
     The SOCKS4A protocol does not support password authentication.
@@ -71,11 +71,10 @@ val socks5_authentication_method_of_char : char -> socks5_authentication_method
     translates the given character to a [socks5_authentication_method]
     value. If no matches were found, the value is [No_acceptable_methods]. *)
 
-val make_socks5_request : string -> int -> (string, request_invalid_argument) Result.result
-(** [make_socks5_request hostname port] returns a binary string which
-    represents a SOCKS5 request which comprises a CONNECT operation with the
-    ATYP (address type) set to 'DOMAINNAME'.
-    The length of DOMAINNAME must be 1..255
+val make_socks5_request : socks5_request -> (string, request_invalid_argument) Result.result
+(** [make_socks5_request (Connect|Bind {address; port}) ]
+    returns a binary string which represents a SOCKS5 request as described in RFC 1928 section "4.  Requests" (on page 3).
+    For DOMAINNAME addresses the length of the domain must be 1..255
 *)
 
 val parse_socks5_connect :
@@ -87,11 +86,13 @@ val parse_socks5_connect :
     If anything is amiss, it will return [R.error] values, wrapping
     [Invalid_argument], [Invalid_request] and [Incomplete_request]. *)
 
-val make_socks5_response : bnd_port:int -> socks5_reply_field -> (string, unit) result
-(** [make_socks5_response ~bnd_port reply_field] returns a binary string which
-    represents a SOCKS5 response. *)
+val make_socks5_response : socks5_reply_field -> bnd_port:int -> socks5_address ->(string, unit) result
+(** [make_socks5_response reply_field ~bnd_port address] returns a binary string which represents the response to a SOCKS5 action (CONNECT|BIND|UDP_ASSOCIATE).
+ NB that for e.g. BIND you will need to send several of these.
+ TODO reference RFC section.
+*)
 
-val parse_socks5_response : string -> socks5_response_result
-(** [parse_response result] returns an OK [Result.result] with a unit value on
-    success, and a [Rejected] on failure. Bad values return an
-    [Incomplete_response]. *)
+val parse_socks5_response : string -> (socks5_reply_field * socks5_struct * leftover_bytes, socks5_response_error) result
+(** [parse_response response_string]
+  TODO document. But basically it returns the error code (if any), and the remote bound address/port info from the server.
+*)

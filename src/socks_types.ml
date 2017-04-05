@@ -17,7 +17,7 @@ type socks5_struct =
 type socks5_request =
 | Connect of socks5_struct
 | Bind of socks5_struct
-(* | Udp_associate of socks5_udp_associate *)
+| UDP_associate of socks5_struct
 
 type request_invalid_argument = Invalid_hostname | Invalid_port
 
@@ -42,18 +42,23 @@ type request_result =
   | Socks5_method_selection_request of socks5_method_selection_request * leftover_bytes
   | Socks4_request of socks4_request * leftover_bytes
 
-type socks5_response_result =
+type socks5_reply_field =
+  | (* 0 *) Succeeded
+  | (* 1 *) General_socks_server_failure
+  | (* 2 *) Connection_not_allowed_by_ruleset
+  | (* 3 *) Network_unreachable
+  | (* 4 *) Host_unreachable
+  | (* 5 *) Connection_refused
+  | (* 6 *) TTL_expired
+  | (* 7 *) Command_not_supported
+  | (* 8 *) Address_type_not_supported
+  | (* _ *) Unassigned
+
+type socks5_response_error =
   | Incomplete_response
-  | Bound_domain of string * int * leftover_bytes
-  | Bound_ipv4 of string * int * leftover_bytes
-  | Bound_ipv6 of string * int * leftover_bytes
   | Invalid_response
 
 type socks5_username_password_request_parse_result =
   | Incomplete_request
   | Invalid_request
   | Username_password of socks5_username * socks5_password * leftover_bytes
-
-type socks5_reply_field =
-  | Succeeded
-  | Failure
