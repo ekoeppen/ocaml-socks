@@ -1,6 +1,6 @@
 version = "0.1"
 description = "SOCKS proxy handling"
-requires = "rresult"
+requires = "rresult ipaddr qcheck oUnit"
 archive(byte) = "socks.cma"
 plugin(byte) = "socks.cma"
 archive(native) = "socks.cmxa"
@@ -10,11 +10,22 @@ exists_if = "socks.cma"
 package "socks_lwt" (
  version = "%%VERSION_NUM%%"
  description = "Lwt wrappers for SOCKS proxy handling"
- requires = "rresult lwt lwt.ppx"
+ requires = "rresult ipaddr lwt lwt.ppx"
  archive(byte) = "socks_lwt.cma"
  plugin(byte) = "socks_lwt.cma"
  archive(native) = "socks_lwt.cmxa"
  plugin(native) = "socks_lwt.cmxs"
  exists_if = "socks_lwt.cma"
+)
+
+package "socks_mirage_lwt" (
+ version = "%%VERSION_NUM%%"
+ description = "Mirage wrappers for SOCKS proxy handling"
+ requires = "rresult ipaddr mirage-protocols mirage-protocols-lwt lwt lwt.ppx"
+ archive(byte) = "socks_mirage_lwt.cma"
+ plugin(byte) = "socks_mirage_lwt.cma"
+ archive(native) = "socks_mirage_lwt.cmxa"
+ plugin(native) = "socks_mirage_lwt.cmxs"
+ exists_if = "socks_mirage_lwt.cma"
 )
 

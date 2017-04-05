@@ -4,6 +4,10 @@
 open Topkg
 
 let () =
+  let mirage = Conf.with_pkg ~default:false "mirage" in
   Pkg.describe "socks" @@ fun c ->
-  Ok [ Pkg.mllib "src/socks.mllib";
-       Pkg.test "test/test" ]
+  let mirage = Conf.value c mirage in
+  Ok [ Pkg.mllib "src/socks.mllib"
+     ; Pkg.mllib ~cond:mirage "mirage/socks.mllib"
+     ; Pkg.test "test/test"
+     ]

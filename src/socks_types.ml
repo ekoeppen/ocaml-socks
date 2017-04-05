@@ -5,9 +5,19 @@ type socks4_request =
   ; address : string
   ; username : string }
 
-type socks5_connect =
+type socks5_address =
+| IPv4_address of Ipaddr.V4.t
+| IPv6_address of Ipaddr.V6.t
+| Domain_address of string
+
+type socks5_struct =
   { port    : int
-  ; address : string }
+  ; address : socks5_address }
+
+type socks5_request =
+| Connect of socks5_struct
+| Bind of socks5_struct
+(* | Udp_associate of socks5_udp_associate *)
 
 type request_invalid_argument = Invalid_hostname | Invalid_port
 

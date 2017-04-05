@@ -203,7 +203,7 @@ let parse_socks5_connect buf =
       else
       if atyp_len = 0 then R.error Invalid_request
       else
-      let address = String.sub buf 5 atyp_len in
+      let address = Domain_address String.(sub buf 5 atyp_len) in
       let port = int_of_bigendian_port_tuple
                    ~port_msb:buf.[5+atyp_len]
                    ~port_lsb:buf.[5+atyp_len+1]

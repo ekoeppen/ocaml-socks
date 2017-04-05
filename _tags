@@ -3,6 +3,7 @@ true: warn(+A-4-18-41-42-44-48-58)
 "src": include
 
 <*/*>: package(rresult), package(ipaddr)
-<*/*_lwt.ml>: package(lwt)
+<*/*_lwt.*>: package(lwt)
+<mirage/*>: package(mirage-protocols)
 <test/*>: package(oUnit), package(qcheck)
 

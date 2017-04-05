@@ -80,7 +80,7 @@ val make_socks5_request : string -> int -> (string, request_invalid_argument) Re
 
 val parse_socks5_connect :
   string ->
-  (socks5_connect * leftover_bytes, socks5_username_password_request_parse_result)
+  (socks5_struct * leftover_bytes, socks5_username_password_request_parse_result)
   Result.result
 (** [parse_socks5_connect buf] returns an OK result with port and hostname
     if [buf] represents a SOCKS5 CONNECT command with the DOMAINNAME form.

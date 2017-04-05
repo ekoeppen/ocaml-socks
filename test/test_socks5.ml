@@ -139,14 +139,14 @@ let test_parse_socks5_connect _ =
   let truncated_connect_string = String.sub connect_string 0 (min String.(length connect_string) truncation) in
   begin match parse_socks5_connect connect_string with
   | Error Invalid_request when 0 = String.length address -> true
-  | Ok ({port = parsed_port; address = parsed_address}, parsed_leftover)
+  | Ok ({port = parsed_port; address = Domain_address parsed_address}, parsed_leftover)
     when port = parsed_port
       && address = parsed_address
       && parsed_leftover = extraneous
     ->
     begin match parse_socks5_connect truncated_connect_string with
     | Error Incomplete_request when truncation < valid_request_len -> true
-    | Ok ({port = truncated_port; address = truncated_address}, truncated_leftover)
+    | Ok ({port = truncated_port; address = Domain_address truncated_address}, truncated_leftover)
       when port = truncated_port
         && address = truncated_address
         && truncated_leftover = String.sub extraneous 0 (min String.(length extraneous) (truncation-valid_request_len))

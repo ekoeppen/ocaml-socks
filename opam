@@ -1,32 +1,45 @@
 opam-version: "1.2"
-descr: "SOCKS 4A and SOCKS 5 (RFC 1928; RFC 1929) proxy library"
+description: "SOCKS 4A and SOCKS 5 (RFC 1928; RFC 1929) proxy library"
 maintainer: "root@localhost"
 authors: [ "none" ]
 license: "gopher://license.to.kill"
 homepage: "https://github.com/cfcs/ocaml-socks"
 dev-repo: "https://github.com/cfcs/ocaml-socks"
 bug-reports: "https://github.com/cfcs/ocaml-socks/issues"
-build: [
-  ["oasis" "setup"]
-  ["ocaml" "setup.ml" "-configure" "--prefix" prefix]
-  ["ocaml" "setup.ml" "-build"]
-]
-install: ["ocaml" "setup.ml" "-install"]
+
+available: [ ocaml-version >= "4.03.0" ]
+
 remove: [
   ["ocamlfind" "remove" "socks"]
 ]
-build-test: [
-  ["oasis" "setup"]
-  ["ocaml" "setup.ml" "-configure" "--enable-tests"]
-  ["ocaml" "setup.ml" "-build"]
-  ["ocaml" "setup.ml" "-test"]
+
+build: [
+  ["ocaml" "pkg/pkg.ml" "build" "--tests" "false"
+     "--with-mirage"
+       "%{mirage-protocols-lwt+lwt+tcpip:installed}"
+  ]
 ]
+build-test: [
+  ["ocaml" "pkg/pkg.ml" "build" "--tests" "true" ]
+  ["ocaml" "pkg/pkg.ml" "test" ]
+]
+
 depends: [
-  "lwt"
   "ocamlbuild" {build}
   "ocamlfind" {build}
-  "ounit" {test}
+  "oUnit" {test}
   "qcheck" {test}
   "rresult"
+  "ipaddr"
 ]
-available: [ ocaml-version >= "4.03.0" ]
+depopts: [
+  (* for the lwt wrapper *)
+    "lwt"
+  (* mirage socks proxy *)
+    "mirage-protocols-lwt"
+    "tcpip"
+]
+conflicts: [
+  "tcpip" {<"2.8.0"}
+  "mirage-types-lwt" {<"3.0.0"}
+]
