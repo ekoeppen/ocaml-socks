@@ -1,10 +1,9 @@
 opam-version: "1.2"
-description: "SOCKS 4A and SOCKS 5 (RFC 1928; RFC 1929) proxy library"
 maintainer: "root@localhost"
 authors: [ "none" ]
 license: "gopher://license.to.kill"
 homepage: "https://github.com/cfcs/ocaml-socks"
-dev-repo: "https://github.com/cfcs/ocaml-socks"
+dev-repo: "https://github.com/cfcs/ocaml-socks.git"
 bug-reports: "https://github.com/cfcs/ocaml-socks/issues"
 
 available: [ ocaml-version >= "4.03.0" ]
@@ -12,11 +11,15 @@ available: [ ocaml-version >= "4.03.0" ]
 remove: [
   ["ocamlfind" "remove" "socks"]
 ]
-
+install: [
+  ["ocamlfind" "install" "socks"]
+]
 build: [
   ["ocaml" "pkg/pkg.ml" "build" "--tests" "false"
      "--with-mirage"
        "%{mirage-protocols-lwt+lwt+tcpip:installed}"
+     "--with-lwt"
+       "%{lwt:installed}"
   ]
 ]
 build-test: [
@@ -36,6 +39,7 @@ depopts: [
   (* for the lwt wrapper *)
     "lwt"
   (* mirage socks proxy *)
+    "mirage-protocols"
     "mirage-protocols-lwt"
     "tcpip"
 ]

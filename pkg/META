@@ -1,5 +1,5 @@
 version = "0.1"
-description = "SOCKS proxy handling"
+description = "SOCKS 4A and SOCKS 5 (RFC 1928; RFC 1929) proxy library"
 requires = "rresult ipaddr qcheck oUnit"
 archive(byte) = "socks.cma"
 plugin(byte) = "socks.cma"
@@ -21,7 +21,7 @@ package "socks_lwt" (
 package "socks_mirage_lwt" (
  version = "%%VERSION_NUM%%"
  description = "Mirage wrappers for SOCKS proxy handling"
- requires = "rresult ipaddr mirage-protocols mirage-protocols-lwt lwt lwt.ppx"
+ requires = "rresult ipaddr tcpip mirage-protocols mirage-protocols-lwt lwt lwt.ppx"
  archive(byte) = "socks_mirage_lwt.cma"
  plugin(byte) = "socks_mirage_lwt.cma"
  archive(native) = "socks_mirage_lwt.cmxa"
