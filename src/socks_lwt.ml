@@ -4,7 +4,7 @@ open Rresult
 open Lwt
 open Socks
 open Socks_types
-
+(* TODO doesn't compile
 let connect_socks4_client (username : string)
                    (proxy_fd_in   : Lwt_io.input_channel)
                    (proxy_fd_out  : Lwt_io.output_channel)
@@ -42,3 +42,4 @@ let receive_request (client_fd_in : Lwt_io.input_channel) : Socks_types.request_
     | result -> return result
     end
   in read_request ""
+*)
