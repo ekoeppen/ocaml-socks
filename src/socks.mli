@@ -19,23 +19,6 @@ val parse_request : string -> request_result
 
     Valid requests are either SOCKS 5 authentication requests, or SOCKS 4A CONNECT requests. *)
 
-(** {2:basic Functions specific to SOCKS 4A} *)
-
-val make_socks4_request : username:string -> hostname:string -> int -> (string, request_invalid_argument) result
-(** [make_socks4_request ~username ~hostname port] returns a binary string
-    which represents a SOCKS4A request.
-    The SOCKS4A protocol does not support password authentication.
-*)
-
-val make_socks4_response : success:bool -> string
-(** [make_response success] returns a binary string which represents a granted
-    or rejected response. *)
-
-val parse_socks4_response : string -> (leftover_bytes, socks4_response_error) Result.result
-(** [parse_response result] returns an OK [Result.result] with a unit value on
-    success, and a [Rejected] on failure. Bad values return an
-    [Incomplete_response]. *)
-
 (** {2:basic Functions specific to SOCKS 5} *)
 
 val make_socks5_auth_request : username_password:bool -> string

@@ -1,11 +1,3 @@
-(* SOCKS4 / SOCKS4a
-
-http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol
-
-https://en.wikipedia.org/wiki/SOCKS#SOCKS4a
-
-*)
-
 open Rresult
 include Socks_types
 
@@ -20,30 +12,6 @@ let bigendian_port_of_int port =
     ]
   | _ -> R.error ()
   end
-
-let make_socks4_request ~username ~hostname port : (string, request_invalid_argument) result =
-  let hostname_len = String.length hostname in
-  if 0 == hostname_len || 255 < hostname_len
-  then R.error (Invalid_hostname : request_invalid_argument)
-  else R.ok ()
-  >>= fun _ ->
-  bigendian_port_of_int port
-  |> R.reword_error (fun () -> Invalid_port)
-  >>= fun port ->
-  R.ok @@ String.concat ""
-    [ (* field 1: SOCKS version *)
-      "\x04"
-      (* field 2: command code: "connect stream": *)
-    ; "\x01"
-      (* field 3: bigendian port: *)
-    ; port
-      (* field 4: invalid ip: *)
-    ; "\x00\x00\x00\xff"
-      (* field 5: user ID string followed by terminator: *)
-    ; username ; "\x00"
-      (* field 6: hostname string followed by terminator: *)
-    ; hostname ; "\x00"
-    ]
 
 let string_of_socks5_authentication_method : socks5_authentication_method -> string = function
   | No_authentication_required -> "\x00"
@@ -205,20 +173,6 @@ let make_socks5_response reply_field ~bnd_port address =
     (* BND.PORT *)
   @ [ bnd_port ]
 
-let make_socks4_response ~(success : bool) = String.concat ""
-  (* field 1: null byte*)
-  [ "\x00"
-  (* field 2: status, 1 byte 0x5a = granted; 0x5b = rejected/failed : *)
-  ; (if success then "\x5a" else "\x5b")
-  (* Note: the next two fields are "ignored" according to the RFC,
-   * but socat (among other clients) refuses to parse the response
-   * if it's not zeroed out, so that's what we do (same as ssh): *)
-  (* field 3: bigendian port: *)
-  ; String.make 2 '\x00'
-  (* field 4: "network byte order ip address"*)
-  ; String.make 4 '\x00' (* IP *)
-  ]
-
 let socks5_authentication_method_of_char : char -> socks5_authentication_method = function
   | '\x00' -> No_authentication_required
   | '\x03' -> Username_password ("", "")
@@ -276,7 +230,7 @@ let parse_request buf : request_result =
          ( auth_methods,
            (String.sub buf method_selection_end (buf_len - method_selection_end) ))
      else Invalid_request
-   | _ -> 
+   | _ ->
   begin match buf.[0], buf.[1], buf.[2], buf.[3] with
   | exception Invalid_argument _ -> Incomplete_request
   | '\x04' , '\x01' , port_msb, port_lsb -> (* SOCKS 4 CONNECT*)
@@ -315,26 +269,6 @@ let parse_request buf : request_result =
   | _ -> Invalid_request
   end
   end
-
-let parse_socks4_response result : (string, socks4_response_error) Result.result =
-  let buf_len = String.length result in
-  if 8 > buf_len then
-    R.error (Incomplete_response : socks4_response_error)
-  else
-  if result.[0] = '\x00'
-    && result.[1] = '\x5a'
-    (* TODO not checking port *)
-    && result.[4] = '\x00'
-    && result.[5] = '\x00'
-    && result.[6] = '\x00'
-    && result.[7] = '\xff'
-  then
-    if buf_len <> 8 then
-      R.ok @@ String.sub result 8 (buf_len - 8)
-    else
-      R.ok ""
-  else
-    R.error Rejected
 
 let parse_socks5_response buf : (socks5_reply_field * socks5_struct * leftover_bytes, socks5_response_error) result =
   let buf_len = String.length buf in
