@@ -26,14 +26,8 @@ depends: [
   "ipaddr"
 ]
 depopts: [
-  (* for the lwt wrapper *)
-    "lwt"
-  (* mirage socks proxy *)
-    "mirage-protocols"
-    "mirage-protocols-lwt"
     "tcpip"
 ]
 conflicts: [
   "tcpip" {<"2.8.0"}
-  "mirage-types-lwt" {<"3.0.0"}
 ]
