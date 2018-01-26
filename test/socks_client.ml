@@ -13,17 +13,38 @@ let of_socket socket =
   let ic = Lwt_io.of_fd ~mode:Lwt_io.input socket in
   {oc; ic}
 
-let connect ~proxy ~host ~port =
-  let connect_str = R.get_ok (Socks.make_socks5_request (Connect {address = Domain_address host; port = port})) in
+let connect_to_proxy proxy =
   let socket = Lwt_unix.socket Lwt_unix.PF_INET Lwt_unix.SOCK_STREAM 0 in
   let%lwt host_info = Lwt_unix.gethostbyname proxy in
   let server_address = host_info.Lwt_unix.h_addr_list.(0) in
   let%lwt () = Lwt_unix.connect socket (Lwt_unix.ADDR_INET (server_address, 1080)) in
-  Logs.info (fun m -> m "Connected via %s to %s, port %d" proxy host port);
+  Logs.info (fun m -> m "Connected to proxy %s" proxy);
+  return socket
+
+let send_connect_request conn host port =
+  let connect_str = R.get_ok (Socks.make_socks5_request (Connect {address = Domain_address host; port = port})) in
+  Lwt_io.write conn.oc connect_str
+
+let connect ~proxy ~host ~port =
+  let%lwt socket = connect_to_proxy proxy in
   let conn = of_socket socket in
-  let%lwt () = Lwt_io.write conn.oc "\005\001\000" in
+  let%lwt () = Lwt_io.write conn.oc (make_socks5_auth_request ~username_password:false) in
   let%lwt response = Lwt_io.read ~count:2 conn.ic in
-  Logs.info (fun m -> m "Connection result: %d bytes" (String.length response));
+  let auth_method = parse_socks5_auth_response response in
+  begin match auth_method with
+    | No_acceptable_methods -> Logs.err (fun m -> m "No acceptable auth methods")
+    | _ -> Logs.info (fun m -> m "Auth OK")
+  end;
+  let%lwt () = send_connect_request conn host port in
+  let%lwt response = Lwt_io.read ~count:10 conn.ic in
+  let c = parse_socks5_response response in
+  begin match c with
+    | Ok _ -> Logs.info (fun m -> m "Connect request ok")
+    | Error _ -> Logs.err (fun m -> m "Connect failed")
+  end;
+  let%lwt () = Lwt_io.write conn.oc "HEAD / HTTP/1.0\r\n\r\n" in
+  let%lwt head = Lwt_io.read conn.ic in
+  Logs.info (fun m -> m "Head: %s" head);
   return conn
 
 let client _ proxy host port =

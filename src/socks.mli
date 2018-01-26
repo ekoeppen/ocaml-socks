@@ -16,21 +16,15 @@ type socks5_request =
 
 type request_invalid_argument = Invalid_hostname | Invalid_port
 
-type socks4_response_error =
-  | Rejected
-  | Incomplete_response (* The user should read more bytes and call again *)
-
 type socks5_username = string
 type socks5_password = string
 type leftover_bytes = string
 
 type socks5_authentication_method =
   | No_authentication_required
+  | GSSAPI
   | Username_password of (socks5_username * socks5_password)
   | No_acceptable_methods
-
-type socks5_init_struct =
-  { methods : socks5_authentication_method list }
 
 type socks5_method_selection_request = socks5_authentication_method list
 
@@ -76,7 +70,8 @@ val make_socks5_auth_request : username_password:bool -> string
     This library only supports "no auth" and "username/password" authentication.
 *)
 
-(** [parse_socks5_auth_request data] is contained within [parse_request]
+val parse_socks5_auth_response : string -> socks5_authentication_method
+(** parse SOCKS5 authentication response
 *)
 
 val make_socks5_auth_response : socks5_authentication_method -> string

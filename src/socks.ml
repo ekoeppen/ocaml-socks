@@ -18,16 +18,13 @@ type socks5_request =
 
 type request_invalid_argument = Invalid_hostname | Invalid_port
 
-type socks4_response_error =
-  | Rejected
-  | Incomplete_response (* The user should read more bytes and call again *)
-
 type socks5_username = string
 type socks5_password = string
 type leftover_bytes = string
 
 type socks5_authentication_method =
   | No_authentication_required
+  | GSSAPI
   | Username_password of (socks5_username * socks5_password)
   | No_acceptable_methods
 
@@ -71,8 +68,15 @@ let bigendian_port_of_int port =
 
 let string_of_socks5_authentication_method : socks5_authentication_method -> string = function
   | No_authentication_required -> "\x00"
+  | GSSAPI -> "\x01"
   | Username_password _ -> "\x02"
   | No_acceptable_methods -> "\xFF"
+
+let socks5_authentication_method_of_char : char -> socks5_authentication_method = function
+  | '\x00' -> No_authentication_required
+  | '\x01' -> GSSAPI
+  | '\x02' -> Username_password ("", "")
+  | '\x03'..'\xFF' -> No_acceptable_methods
 
 let string_of_socks5_reply_field = function
   | Succeeded -> "\x00"
@@ -170,6 +174,30 @@ let parse_socks5_username_password_request buf : socks5_username_password_reques
                         String.(sub buf (3 + ulen + plen) (buf_len - 3 - ulen - plen))
      )
   | _ -> Invalid_request
+  end
+
+let parse_socks5_auth_response buf : socks5_authentication_method =
+  let buf_len = String.length buf in
+  begin match buf.[0], buf.[1] with
+   | exception Invalid_argument _ -> No_acceptable_methods
+   | '\x05', nmethods  -> (* SOCKS 5 CONNECT *)
+     let nmethods = int_of_char nmethods in
+     if nmethods < 1 then No_authentication_required
+     else
+     let method_selection_end = 1 (* version *) + 1 (* nmethods *) + nmethods in
+     if buf_len < method_selection_end
+     then No_acceptable_methods
+     else
+     let rec f_auth_methods acc n =
+       if n > 0
+       then f_auth_methods (socks5_authentication_method_of_char buf.[1+n] :: acc) (n-1)
+       else acc
+     in
+     let auth_methods = f_auth_methods [] nmethods in
+     if List.length auth_methods <> 0 && not @@ List.mem No_acceptable_methods auth_methods
+     then List.nth auth_methods 0
+     else No_acceptable_methods
+  | _ -> No_acceptable_methods
   end
 
 let serialize_address =
