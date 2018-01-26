@@ -2,7 +2,6 @@ open QCheck
 open QCheck.Test
 open OUnit2
 open Socks
-open Socks_types
 
 let bigendian_port_of_int port =
   String.concat ""
@@ -84,45 +83,6 @@ let test_making_a_request _ =
     )
 ;;
 
-let test_parse_request _ =
-  check_exn @@ QCheck.Test.make ~count:20000
-  ~name:"testing socks5: parse_request"
-  (pair small_string string)
-  @@ (fun (methods, extraneous) ->
-     let data = "\x05"
-              ^ String.(length methods |> char_of_int |> make 1)
-                ^ methods
-              ^ extraneous
-     in let data_len = String.length data in
-     begin match parse_request data with
-     | Socks5_method_selection_request ([], _) ->
-         false (* This should be an Invalid_request *)
-     | Socks5_method_selection_request (mthds, _)
-       when List.(length mthds <> String.length methods) ->
-         false
-     | Socks5_method_selection_request (_, x)
-       when x <> extraneous -> false
-
-     | Socks5_method_selection_request (authlst, x)
-       when not @@ List.mem No_acceptable_methods authlst
-            && authlst <> []
-            && x = extraneous -> true
-         (*when there is at least one auth method, and the extraneous matches *)
-
-     | Incomplete_request
-       when data_len < 1+1 + String.(length methods + length extraneous)
-       -> true (* Up to and including missing one byte we ask for more *)
-
-     | Incomplete_request -> false
-     | Socks4_request _ -> false
-
-     | Invalid_request ->
-         true (* Expected behavior is to reject invalid requests; hence true *)
-     | _ -> false
-     end
-     )
-;;
-
 let test_parse_socks5_connect _ =
   let header = "\x05\x01\x00\x03" in
   check_exn @@ QCheck.Test.make ~count:20000
@@ -164,7 +124,7 @@ let test_make_socks5_response _ =
   ~name:"testing socks5: make_socks5_response"
   (quad small_int bool small_string small_string)
   @@ (fun (bnd_port, reply, domain, extraneous) ->
-    let reply = begin match reply with true -> Succeeded | false -> Socks_types.General_socks_server_failure end in
+    let reply = begin match reply with true -> Succeeded | false -> Socks.General_socks_server_failure end in
     let domain_len = String.length domain in
     begin match make_socks5_response ~bnd_port reply (Domain_address domain) with
     | Error () when 0 = domain_len -> true
@@ -223,7 +183,6 @@ let test_parse_socks5_response_ipv4_ipv6 _ =
 
 let suite = [
   "socks5: make_socks5_auth_request" >:: test_make_socks5_auth_request;
-  "socks5: parse_request" >:: test_parse_request;
   "socks5: make_socks5_username_password_request" >:: test_make_socks5_username_password_request;
   "socks5: parse_socks5_username_password_request" >:: test_parse_socks5_username_password_request;
   "socks5: make_socks5_request" >:: test_making_a_request;

@@ -3,7 +3,5 @@ true: warn(+A-4-18-41-42-44-48-58)
 "src": include
 
 <*/*>: package(rresult), package(ipaddr)
-<*/*_lwt.*>: package(lwt), package(lwt.ppx)
-<mirage/*>: package(mirage-protocols), package(mirage-protocols-lwt), package(tcpip)
-<test/*>: package(oUnit), package(qcheck)
+<test/*>: package(oUnit), package(qcheck), package(lwt), package(lwt.ppx), package(cmdliner), package(logs), package(fmt), package(lwt.unix), package(logs.fmt), package(logs.cli), package(fmt.cli), package(fmt.tty)
 

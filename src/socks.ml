@@ -1,5 +1,61 @@
 open Rresult
-include Socks_types
+
+(* types for SOCKS4; SOCKS4A; SOCKS5 *)
+
+type socks5_address =
+| IPv4_address of Ipaddr.V4.t
+| IPv6_address of Ipaddr.V6.t
+| Domain_address of string
+
+type socks5_struct =
+  { port    : int
+  ; address : socks5_address }
+
+type socks5_request =
+| Connect of socks5_struct
+| Bind of socks5_struct
+| UDP_associate of socks5_struct
+
+type request_invalid_argument = Invalid_hostname | Invalid_port
+
+type socks4_response_error =
+  | Rejected
+  | Incomplete_response (* The user should read more bytes and call again *)
+
+type socks5_username = string
+type socks5_password = string
+type leftover_bytes = string
+
+type socks5_authentication_method =
+  | No_authentication_required
+  | Username_password of (socks5_username * socks5_password)
+  | No_acceptable_methods
+
+type socks5_init_struct =
+  { methods : socks5_authentication_method list }
+
+type socks5_method_selection_request = socks5_authentication_method list
+
+type socks5_reply_field =
+  | (* 0 *) Succeeded
+  | (* 1 *) General_socks_server_failure
+  | (* 2 *) Connection_not_allowed_by_ruleset
+  | (* 3 *) Network_unreachable
+  | (* 4 *) Host_unreachable
+  | (* 5 *) Connection_refused
+  | (* 6 *) TTL_expired
+  | (* 7 *) Command_not_supported
+  | (* 8 *) Address_type_not_supported
+  | (* _ *) Unassigned
+
+type socks5_response_error =
+  | Incomplete_response
+  | Invalid_response
+
+type socks5_username_password_request_parse_result =
+  | Incomplete_request
+  | Invalid_request
+  | Username_password of socks5_username * socks5_password * leftover_bytes
 
 let bigendian_port_of_int port =
   begin match port with
@@ -204,70 +260,6 @@ let parse_socks5_connect buf =
       R.ok ({ port ; address }, String.sub buf (4+1+atyp_len+2) (buf_len-4-1-atyp_len-2) )
   | exception Invalid_argument _ -> R.error Incomplete_request
   | _ -> R.error Invalid_request
-  end
-
-let parse_request buf : request_result =
-  let buf_len = String.length buf in
-  begin match buf.[0], buf.[1] with
-   | exception Invalid_argument _ -> Incomplete_request
-   | '\x05', nmethods  -> (* SOCKS 5 CONNECT *)
-     let nmethods = int_of_char nmethods in
-     if nmethods < 1 then Invalid_request
-     else
-     let method_selection_end = 1 (* version *) + 1 (* nmethods *) + nmethods in
-     if buf_len < method_selection_end
-     then Incomplete_request
-     else
-     let rec f_auth_methods acc n =
-       if n > 0
-       then f_auth_methods (socks5_authentication_method_of_char buf.[1+n] :: acc) (n-1)
-       else acc
-     in
-     let auth_methods = f_auth_methods [] nmethods in
-     if List.length auth_methods <> 0 && not @@ List.mem No_acceptable_methods auth_methods
-     then
-       Socks5_method_selection_request
-         ( auth_methods,
-           (String.sub buf method_selection_end (buf_len - method_selection_end) ))
-     else Invalid_request
-   | _ ->
-  begin match buf.[0], buf.[1], buf.[2], buf.[3] with
-  | exception Invalid_argument _ -> Incomplete_request
-  | '\x04' , '\x01' , port_msb, port_lsb -> (* SOCKS 4 CONNECT*)
-    let username_offset = 8 in
-    begin match String.index_from buf username_offset '\x00' with
-    | exception Not_found -> (* no user_id / user_id > 255 *)
-        if buf_len < username_offset + 256
-        then Incomplete_request
-        else Invalid_request
-    | username_end ->
-      let port = int_of_bigendian_port_tuple ~port_msb:port_msb ~port_lsb:port_lsb in
-      let username = String.sub buf username_offset (username_end - username_offset) in
-      begin match buf.[4], buf.[5], buf.[6] with
-      | exception Invalid_argument _ ->
-          Incomplete_request
-      | '\x00' , '\x00', '\x00' ->
-        let address_offset = 1 + username_end in
-        begin match String.index_from buf address_offset '\x00' with
-        | exception Not_found -> (* no domain name / domain name > 255 *)
-            if buf_len < address_offset + 256
-            then Incomplete_request
-            else Invalid_request
-        | address_end ->
-          let address = String.sub buf address_offset (address_end - address_offset) in
-          Socks4_request ({ port ; username ; address},
-                         String.sub buf (address_end + 1) (buf_len - address_end -1))
-        end
-      | _ -> (* address is an IPv4 tuple *)
-        let address = String.concat "." List.(map
-          (fun i -> string_of_int (int_of_char buf.[i])) [ 4; 5; 6; 7 ] )
-        in
-        Socks4_request ({ port ; username ; address}
-          , String.sub buf (username_end +1 + 4) (buf_len - username_end - 4 -1))
-      end
-    end
-  | _ -> Invalid_request
-  end
   end
 
 let parse_socks5_response buf : (socks5_reply_field * socks5_struct * leftover_bytes, socks5_response_error) result =
