@@ -51,8 +51,6 @@ val make_socks5_auth_request : username_password:bool -> string
 
 val parse_socks5_auth_response : string -> socks5_authentication_method
 
-val make_socks5_auth_response : socks5_authentication_method -> string
-
 val make_socks5_username_password_request :
   username:string -> password:string -> (string,unit) Result.result
 

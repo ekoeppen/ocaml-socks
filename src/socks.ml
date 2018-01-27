@@ -118,14 +118,6 @@ let make_socks5_auth_request ~(username_password:bool) =
    see [parse_request]
 *)
 
-let make_socks5_auth_response auth_method =
-  String.concat ""
-    [ (* SOCKS version*)
-      "\x05"
-      (* METHOD chosen by the server *)
-    ; string_of_socks5_authentication_method auth_method
-    ]
-
 let encode_str str : (string, unit) result =
   (* add uint8_t length prefix, error if not 0 < str < 256 *)
   if String.(length str < 1 || 255 < length str)
