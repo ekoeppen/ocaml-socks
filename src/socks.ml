@@ -155,27 +155,6 @@ let make_socks5_username_password_request ~username ~password =
   ; password
   ]
 
-let parse_socks5_username_password_request buf : socks5_username_password_request_parse_result =
-  let buf_len = String.length buf in
-  if buf_len < 3 then Incomplete_request
-  else
-  begin match buf.[0], buf.[1] with
-  | exception Invalid_argument _ -> Incomplete_request
-  | '\x05', ulen ->
-     let ulen = int_of_char ulen in
-     if buf_len < 3 + ulen then Incomplete_request
-     else
-     let username = String.sub buf 2 ulen in
-     let plen = int_of_char buf.[1+1+ulen] in
-     if buf_len < 3 + ulen + plen then Incomplete_request
-     else
-     let password = String.sub buf (3 + ulen) plen in
-     Username_password (username , password,
-                        String.(sub buf (3 + ulen + plen) (buf_len - 3 - ulen - plen))
-     )
-  | _ -> Invalid_request
-  end
-
 let parse_socks5_auth_response buf : socks5_authentication_method =
   let buf_len = String.length buf in
   begin match buf.[0], buf.[1] with
@@ -238,25 +217,6 @@ let make_socks5_request request =
     (* DST.PORT *)
   @ [ port ]
 
-let make_socks5_response reply_field ~bnd_port address =
-  serialize_address address
-  >>= fun address ->
-  bigendian_port_of_int bnd_port
-  >>= fun bnd_port ->
-  R.ok @@
-  String.concat "" @@
-  [ (* SOCKS version *)
-    "\x05"
-    (* REP - reply field *)
-  ; string_of_socks5_reply_field reply_field
-    (* RSV - reserved *)
-  ; "\x00"
-    (* ATYP - adddress type *)
-    (* BND.ADDR *)
-  ] @ address
-    (* BND.PORT *)
-  @ [ bnd_port ]
-
 let socks5_authentication_method_of_char : char -> socks5_authentication_method = function
   | '\x00' -> No_authentication_required
   | '\x03' -> Username_password ("", "")
@@ -264,31 +224,6 @@ let socks5_authentication_method_of_char : char -> socks5_authentication_method 
 
 let int_of_bigendian_port_tuple ~port_msb ~port_lsb =
   (int_of_char port_msb lsl 8) + int_of_char port_lsb
-
-let parse_socks5_connect buf =
-  let buf_len = String.length buf in
-  begin match buf.[0], buf.[1], buf.[2], buf.[3] with
-  | '\x05', (* VER - version *)
-    '\x01', (* CMD - TODO we only implement CONNECT *)
-    '\x00', (* RSV - reserved *)
-    '\x03' (* ATYP TODO: we only implement DOMAINNAME *)
-    ->
-      if buf_len < 5 then R.error Incomplete_request
-      else
-      let atyp_len = int_of_char buf.[4] in
-      if buf_len < 2 + 5 + atyp_len then R.error Incomplete_request
-      else
-      if atyp_len = 0 then R.error Invalid_request
-      else
-      let address = Domain_address String.(sub buf 5 atyp_len) in
-      let port = int_of_bigendian_port_tuple
-                   ~port_msb:buf.[5+atyp_len]
-                   ~port_lsb:buf.[5+atyp_len+1]
-      in
-      R.ok ({ port ; address }, String.sub buf (4+1+atyp_len+2) (buf_len-4-1-atyp_len-2) )
-  | exception Invalid_argument _ -> R.error Incomplete_request
-  | _ -> R.error Invalid_request
-  end
 
 let parse_socks5_response buf : (socks5_reply_field * socks5_struct * leftover_bytes, socks5_response_error) result =
   let buf_len = String.length buf in

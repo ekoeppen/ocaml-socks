@@ -1,10 +1,10 @@
-opam-version: "1.2"
-maintainer: "root@localhost"
+opam-version: "1.0"
+maintainer: "eck@40hz.org"
 authors: [ "none" ]
-license: "gopher://license.to.kill"
-homepage: "https://github.com/cfcs/ocaml-socks"
-dev-repo: "https://github.com/cfcs/ocaml-socks.git"
-bug-reports: "https://github.com/cfcs/ocaml-socks/issues"
+license: ""
+homepage: "https://github.com/ekoeppen/ocaml-socks5-client"
+dev-repo: "https://github.com/ekoeppen/ocaml-socks5-client"
+bug-reports: "https://github.com/ekoeppen/ocaml-socks5-client/issues"
 
 available: [ ocaml-version >= "4.03.0" ]
 
@@ -22,8 +22,11 @@ depends: [
   "ocamlfind" {build}
   "oUnit" {test}
   "qcheck" {test}
+  "cmdliner" {test}
   "rresult"
   "ipaddr"
+  "lwt"
+  "logs"
 ]
 depopts: [
     "tcpip"
