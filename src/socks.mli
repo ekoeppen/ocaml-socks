@@ -1,5 +1,3 @@
-(* types for SOCKS4; SOCKS4A; SOCKS5 *)
-
 type socks5_address =
 | IPv4_address of Ipaddr.V4.t
 | IPv6_address of Ipaddr.V6.t
@@ -49,49 +47,15 @@ type socks5_username_password_request_parse_result =
   | Invalid_request
   | Username_password of socks5_username * socks5_password * leftover_bytes
 
-(** SOCKS CONNECT parsing and generation *)
-
-(** This library implements functions for parsing and generating
-    the packets required to establish connections using SOCKS CONNECT (versions 4A and 5).
-
-    The parsing functions prefixed with [parse_] return unconsumed bytes in a [type Socks.leftover_bytes = string].
-
-    This version of the library does not handle BIND and UDP methods since
-    I haven't seen that in use anywhere).
-*)
-
-(** {2:basic Functions specific to SOCKS 5} *)
-
 val make_socks5_auth_request : username_password:bool -> string
-(** [make_socks5_auth_request ~username_password] returns a binary
-    string which represents a SOCKS5 authentication request.
-    In the protocol this is a list of authentication modes that the client is willing to use, but in our API it's a choice between "no auth methods" and "username/password".
-
-    This library only supports "no auth" and "username/password" authentication.
-*)
 
 val parse_socks5_auth_response : string -> socks5_authentication_method
-(** parse SOCKS5 authentication response
-*)
 
 val make_socks5_auth_response : socks5_authentication_method -> string
-(** [make_socks5_auth_response auth_method] returns a binary string which
-    represents a SOCKS5 authentication response. *)
 
 val make_socks5_username_password_request :
   username:string -> password:string -> (string,unit) Result.result
-(** [make_socks5_username_password_request ~username ~password] returns a
-    binary string which represents a SOCKS5 password request from [RFC1929].
-    The function fails if either of the strings are longer than 255 bytes, or contain 0 bytes.
-*)
 
 val make_socks5_request : socks5_request -> (string, request_invalid_argument) Result.result
-(** [make_socks5_request (Connect|Bind {address; port}) ]
-    returns a binary string which represents a SOCKS5 request as described in RFC 1928 section "4.  Requests" (on page 3).
-    For DOMAINNAME addresses the length of the domain must be 1..255
-*)
 
 val parse_socks5_response : string -> (socks5_reply_field * socks5_struct * leftover_bytes, socks5_response_error) result
-(** [parse_response response_string]
-  TODO document. But basically it returns the error code (if any), and the remote bound address/port info from the server.
-*)

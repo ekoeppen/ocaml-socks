@@ -77,10 +77,10 @@ let test_parse_socks5_response_ipv4_ipv6 _ =
       when parsed_leftover <> extraneous -> failwith "extraneous fail"
     | Ok (Succeeded,  {address = IPv4_address parsed_ip; _}, _)
       when not do_ipv6 ->
-        if ip = Ipaddr.V4 parsed_ip then true else failwith "ipv4 er fucked"
+        if ip = Ipaddr.V4 parsed_ip then true else failwith "ipv4 mismatch"
     | Ok (Succeeded, {address = IPv6_address parsed_ip; _}, _)
       when do_ipv6 ->
-        if ip = Ipaddr.V6 parsed_ip then true else failwith "ipv6 er fucked"
+        if ip = Ipaddr.V6 parsed_ip then true else failwith "ipv6 mismatch"
     | _ -> false
     end
   )
@@ -93,5 +93,4 @@ let suite = [
   "socks5: parse_socks5_response (IPv4/IPv6)" >:: test_parse_socks5_response_ipv4_ipv6;
 (*"socks5: parse_socks5_response (domainname)" >:: test_parse_socks5_response_domainname;
 *)
-  "socks5: make_socks5_response" >:: test_make_socks5_response;
   ]

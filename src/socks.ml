@@ -1,7 +1,5 @@
 open Rresult
 
-(* types for SOCKS4; SOCKS4A; SOCKS5 *)
-
 type socks5_address =
 | IPv4_address of Ipaddr.V4.t
 | IPv6_address of Ipaddr.V6.t
@@ -27,9 +25,6 @@ type socks5_authentication_method =
   | GSSAPI
   | Username_password of (socks5_username * socks5_password)
   | No_acceptable_methods
-
-type socks5_init_struct =
-  { methods : socks5_authentication_method list }
 
 type socks5_method_selection_request = socks5_authentication_method list
 
