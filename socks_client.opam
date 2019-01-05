@@ -1,5 +1,5 @@
-version:      "1.0.0"
-authors:      "cfcs, Eckhart Koeppen"
+version:      "1.0.1"
+authors:      "https://github.com/cfcs, Eckhart Koeppen"
 maintainer:   "Eckhart Koeppen <eck@40hz.org>"
-license:      "MIT"
+license:      "AGPL"
 opam-version: "1.0"
