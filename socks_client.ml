@@ -212,42 +212,46 @@ let _socks5_authentication_method_of_char : char -> socks5_authentication_method
 let int_of_bigendian_port_tuple ~port_msb ~port_lsb =
   (int_of_char port_msb lsl 8) + int_of_char port_lsb
 
-let parse_socks5_response buf : (socks5_reply_field * socks5_struct * leftover_bytes, socks5_response_error) result =
+let parse_socks5_response buf
+  : (socks5_reply_field * socks5_struct * leftover_bytes,
+     socks5_response_error) result =
   let buf_len = String.length buf in
   if buf_len < 4+1+2 then
     R.error Incomplete_response
   else
-  begin match buf.[0], buf.[1], buf.[2], buf.[3] with
-  | '\x05', ('\x00'..'\x08' as reply_field), '\x00', ('\x01'|'\x03'|'\x04' as atyp) ->
-    begin match atyp with
-    | '\x01' when 4+4+2 <= buf_len -> (* IPv4 *)
-        let address = IPv4_address (match Ipaddr.V4.of_bytes @@ String.sub buf 4 4 with
-          Some ip -> ip | _ -> Ipaddr.V4.unspecified ) in
-        R.ok (address, (*port offset:*) 4+4)
-    | '\x03' when 4+1+2 <= buf_len -> (* DOMAINNAME *)
-      let domain_len = int_of_char buf.[4] in
-      if 0 = domain_len
-      then R.error Invalid_response
-      else
-      if buf_len < 4+1+2+domain_len then
-        R.error Incomplete_response
-      else
-      let domain = Domain_address String.(sub buf (4+1) domain_len) in
-      R.ok (domain , 4+1+domain_len)
-    | '\x04' when 4+16+2 <= buf_len -> (* IPv6 *)
-      let sizeof_ipv6 = 16 (*128/8*) in
-      let address = IPv6_address (match Ipaddr.V6.of_bytes @@ String.sub buf 4 sizeof_ipv6 with
-        Some ip -> ip | _ -> Ipaddr.V6.unspecified) in
-      R.ok (address, 4+sizeof_ipv6)
-    | ('\x01'|'\x03'|'\x04') -> (* when-guards are used for size constraints above *)
-      R.error Incomplete_response
-    | _ -> R.error Invalid_response
-    end
-    >>= fun (address, port_offset) ->
-    let port = int_of_bigendian_port_tuple
-      ~port_msb:buf.[port_offset]
-      ~port_lsb:buf.[port_offset+1]
-    in
-    R.ok ((reply_field_of_char reply_field), {address; port}, String.sub buf (port_offset+2) (buf_len-port_offset-2))
-  | _ -> R.error Invalid_response
-  end
+    begin match buf.[0], buf.[1], buf.[2], buf.[3] with
+      | '\x05', ('\x00'..'\x08' as reply_field), '\x00',
+        ('\x01'|'\x03'|'\x04' as atyp) ->
+        begin match atyp with
+          | '\x01' when 4+4+2 <= buf_len -> (* IPv4 *)
+            Ok (IPv4_address (Ipaddr.V4.of_bytes_raw buf 4),
+                (*port offset:*) 4+4)
+          | '\x03' when 4+1+2 <= buf_len -> (* DOMAINNAME *)
+            let domain_len = int_of_char buf.[4] in
+            if 0 = domain_len
+            then R.error Invalid_response
+            else
+            if buf_len < 4+1+2+domain_len then
+              R.error Incomplete_response
+            else
+              let domain = Domain_address String.(sub buf (4+1) domain_len) in
+              R.ok (domain , 4+1+domain_len)
+          | '\x04' when 4+16+2 <= buf_len -> (* IPv6 *)
+            let sizeof_ipv6 = 16 (*128/8*) in
+            Ok (IPv6_address (Ipaddr.V6.of_bytes_raw buf 4),
+                (*port offset*) 4+sizeof_ipv6)
+          | ('\x01'|'\x03'|'\x04') ->
+            (* ^-- when-guards are used for size constraints above *)
+            R.error Incomplete_response
+          | (_ : char) -> Error Invalid_response
+        end
+        >>= fun (address, port_offset) ->
+        let port = int_of_bigendian_port_tuple
+            ~port_msb:buf.[port_offset]
+            ~port_lsb:buf.[port_offset+1]
+        in
+        R.ok ((reply_field_of_char reply_field),
+              {address; port},
+              String.sub buf (port_offset+2) (buf_len-port_offset-2))
+      | _ -> R.error Invalid_response
+end
