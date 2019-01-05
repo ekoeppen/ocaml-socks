@@ -73,7 +73,7 @@ let socks5_authentication_method_of_char : char -> socks5_authentication_method 
   | '\x02' -> Username_password ("", "")
   | '\x03'..'\xFF' -> No_acceptable_methods
 
-let string_of_socks5_reply_field = function
+let _string_of_socks5_reply_field = function
   | Succeeded -> "\x00"
   | General_socks_server_failure -> "\x01"
   | Connection_not_allowed_by_ruleset -> "\x02"
@@ -204,7 +204,7 @@ let make_socks5_request request =
     (* DST.PORT *)
   @ [ port ]
 
-let socks5_authentication_method_of_char : char -> socks5_authentication_method = function
+let _socks5_authentication_method_of_char : char -> socks5_authentication_method = function
   | '\x00' -> No_authentication_required
   | '\x03' -> Username_password ("", "")
   | _ -> No_acceptable_methods
@@ -221,7 +221,8 @@ let parse_socks5_response buf : (socks5_reply_field * socks5_struct * leftover_b
   | '\x05', ('\x00'..'\x08' as reply_field), '\x00', ('\x01'|'\x03'|'\x04' as atyp) ->
     begin match atyp with
     | '\x01' when 4+4+2 <= buf_len -> (* IPv4 *)
-        let address = IPv4_address (match Ipaddr.V4.of_bytes @@ String.sub buf 4 4 with Some ip -> ip) in
+        let address = IPv4_address (match Ipaddr.V4.of_bytes @@ String.sub buf 4 4 with
+          Some ip -> ip | _ -> Ipaddr.V4.unspecified ) in
         R.ok (address, (*port offset:*) 4+4)
     | '\x03' when 4+1+2 <= buf_len -> (* DOMAINNAME *)
       let domain_len = int_of_char buf.[4] in
@@ -235,10 +236,12 @@ let parse_socks5_response buf : (socks5_reply_field * socks5_struct * leftover_b
       R.ok (domain , 4+1+domain_len)
     | '\x04' when 4+16+2 <= buf_len -> (* IPv6 *)
       let sizeof_ipv6 = 16 (*128/8*) in
-      let address = IPv6_address (match Ipaddr.V6.of_bytes @@ String.sub buf 4 sizeof_ipv6 with Some ip -> ip) in
+      let address = IPv6_address (match Ipaddr.V6.of_bytes @@ String.sub buf 4 sizeof_ipv6 with
+        Some ip -> ip | _ -> Ipaddr.V6.unspecified) in
       R.ok (address, 4+sizeof_ipv6)
     | ('\x01'|'\x03'|'\x04') -> (* when-guards are used for size constraints above *)
       R.error Incomplete_response
+    | _ -> R.error Invalid_response
     end
     >>= fun (address, port_offset) ->
     let port = int_of_bigendian_port_tuple

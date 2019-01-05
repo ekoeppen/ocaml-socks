@@ -1,0 +1,12 @@
+; vim:ft=lisp:ts=2:set expandtab:
+
+(library
+  (name socks_client)
+  (public_name socks_client)
+  (libraries core
+             lwt
+             ipaddr
+             rresult
+             unix)
+  (preprocess (pps lwt_ppx ppx_let ppx_jane))
+  )
